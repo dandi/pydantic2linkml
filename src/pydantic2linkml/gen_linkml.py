@@ -59,7 +59,7 @@ pydantic_version = version.parse(pydantic.__version__)
 if pydantic_version >= version.parse("2.10"):
     literal_values = _typing_extra.literal_values
 else:
-    literal_values = _typing_extra.all_literal_values
+    literal_values = _typing_extra.all_literal_values  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
@@ -101,18 +101,17 @@ class LinkmlGenerator:
             combined collection of `models` and `enums`
         """
 
-        def get_case_insensitive_name(cls) -> str:
+        def get_case_insensitive_name(cls: type) -> str:
             return cls.__name__.casefold()
-
-        def to_sorted_lst(
-            iterable: Optional[Iterable[Union[type[Enum], type[BaseModel]]]],
-        ) -> list[Union[type[Enum], type[BaseModel]]]:
-            return sorted(force_to_set(iterable), key=get_case_insensitive_name)
 
         # Turn models and enums to lists of unique elements sorted by name
         # case-insensitively
-        model_lst = to_sorted_lst(models)
-        enum_lst = to_sorted_lst(enums)
+        model_lst: list[type[BaseModel]] = sorted(
+            force_to_set(models), key=get_case_insensitive_name
+        )
+        enum_lst: list[type[Enum]] = sorted(
+            force_to_set(enums), key=get_case_insensitive_name
+        )
 
         ensure_unique_names(*model_lst, *enum_lst)
 
@@ -962,7 +961,7 @@ class SlotGenerator:
             f"the {mode} validation function, {schema['function']['function']!r}."
         )
         if mode != "plain":
-            self._shape_slot(schema["schema"])
+            self._shape_slot(schema["schema"])  # type: ignore[typeddict-item]
 
     def _function_after_schema(
         self, schema: core_schema.AfterValidatorFunctionSchema

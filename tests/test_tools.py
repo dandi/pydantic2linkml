@@ -244,7 +244,7 @@ def test_get_locally_defined_fields():
 
     class B(A):
         # Overriding definitions
-        a: Optional[str]
+        a: Optional[str]  # type: ignore[assignment]
 
         # New definitions
         x: float
