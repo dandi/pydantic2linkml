@@ -59,6 +59,7 @@ pydantic_version = version.parse(pydantic.__version__)
 if pydantic_version >= version.parse("2.10"):
     literal_values = _typing_extra.literal_values
 else:
+    # `all_literal_values` was renamed to `literal_values` in Pydantic 2.10
     literal_values = _typing_extra.all_literal_values  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
@@ -961,6 +962,8 @@ class SlotGenerator:
             f"the {mode} validation function, {schema['function']['function']!r}."
         )
         if mode != "plain":
+            # PlainValidatorFunctionSchema has no "schema" key, but the
+            # mode != "plain" guard ensures we never reach this for plain schemas
             self._shape_slot(schema["schema"])  # type: ignore[typeddict-item]
 
     def _function_after_schema(
