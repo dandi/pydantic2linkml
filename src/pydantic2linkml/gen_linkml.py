@@ -358,6 +358,9 @@ class LinkmlGenerator:
         slots.sort(key=str.casefold)
         slot_usage.sort(key=lambda s: s.name.casefold())
 
+        # Ensure notes are sorted in a consistent order
+        notes.sort()
+
         return ClassDefinition(
             model.__name__,
             description=(
@@ -367,7 +370,7 @@ class LinkmlGenerator:
             mixins=mixins,
             slots=slots,
             slot_usage=slot_usage,
-            notes=sorted(notes),
+            notes=notes,
         )
 
     def _establish_supporting_defs(self) -> None:
