@@ -358,6 +358,9 @@ class LinkmlGenerator:
         slots.sort(key=str.casefold)
         slot_usage.sort(key=lambda s: s.name.casefold())
 
+        # Ensure notes are sorted in a consistent order
+        notes.sort()
+
         return ClassDefinition(
             model.__name__,
             description=(
@@ -447,6 +450,10 @@ class SlotGenerator:
 
         # Shape the contained slot according to core schema of the corresponding field
         self._shape_slot(self._field_schema.schema)
+
+        # Ensure the notes in the slot definition are sorted in a consistent order
+        assert isinstance(self._slot.notes, list)
+        self._slot.notes.sort()
 
         self._used = True
         return self._slot
