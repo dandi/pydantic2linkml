@@ -72,6 +72,12 @@ ANY_CLASS_DEF = ClassDefinition(
     name="Any", description="Any object", class_uri="linkml:Any"
 )
 
+# Fields of `SlotDefinition` excluded when projecting onto an
+# `AnonymousSlotExpression`. `required` is a slot-level property (whether the
+# slot must be present in an instance) and does not belong in a constraint
+# expression context.
+_ASE_EXCLUDED_SD_FIELDS = frozenset(["required"])
+
 
 class LinkmlGenerator:
     """
@@ -479,6 +485,27 @@ class SlotGenerator:
         :param note: The note to attach
         """
         self._slot.notes.append(f"{__package__}: {note}")
+
+    def _get_ase(self, subschema: core_schema.CoreSchema) -> AnonymousSlotExpression:
+        """
+        Get an `AnonymousSlotExpression` representing a given subschema
+
+        :param subschema: The given subschema. E.g., the schema of a choice in a
+            `core_schema.UnionSchema` which represents a union type in the type
+            annotation of the associated Pydantic model field
+        :return: An `AnonymousSlotExpression` representing the given subschema
+        """
+        sub_field_schema = self._field_schema._replace(schema=subschema)
+        sd = SlotGenerator(sub_field_schema).generate()
+
+        ase_kwargs = {
+            f.name: getattr(sd, f.name)
+            for f in fields(AnonymousSlotExpression)
+            if f.name not in _ASE_EXCLUDED_SD_FIELDS
+        }
+        return AnonymousSlotExpression(**ase_kwargs)
+
+
 
     if pydantic_version >= version.parse("2.10"):
 
@@ -1104,23 +1131,6 @@ class SlotGenerator:
 
         :param schema: The schema representing the union restriction
         """
-        # TODO: the current implementation doesn't address all cases of `Union` partly
-        #   due to limitation of LinkML. Useful information
-        #   can be found at, https://github.com/orgs/linkml/discussions/2154
-
-        def get_model_slot_expression(
-            schema_: core_schema.CoreSchema,
-        ) -> AnonymousSlotExpression:
-            return AnonymousSlotExpression(
-                range=schema_["cls"].__name__,
-            )
-
-        # A map of supported type choices to the functions for generating the
-        # corresponding slot expression
-        supported_type_choices: dict[
-            str, Callable[[core_schema.CoreSchema], AnonymousSlotExpression]
-        ] = {"model": get_model_slot_expression}
-
         choices = schema["choices"]
 
         choice_slot_expressions = []
@@ -1134,17 +1144,7 @@ class SlotGenerator:
                 )
                 return
 
-            # Exits early if a choice is of unsupported type
-            c_type = c["type"]
-            if c_type not in supported_type_choices:
-                self._attach_note(
-                    f"Warning: The translation is incomplete. The union core schema "
-                    f"contains a choice of type {c_type}. The choice type is yet to be "
-                    f"supported. (core schema: {schema})."
-                )
-                return
-
-            choice_slot_expressions.append(supported_type_choices[c_type](c))
+            choice_slot_expressions.append(self._get_ase(c))
 
         self._slot.any_of = choice_slot_expressions
 

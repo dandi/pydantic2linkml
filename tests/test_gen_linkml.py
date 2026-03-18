@@ -908,12 +908,12 @@ class TestSlotGenerator:
 
         slot = translate_field_to_slot(Foo1, "x")
 
-        assert slot.range is None
-        assert in_exactly_one_string(
-            "The union core schema contains a choice of type int. "
-            "The choice type is yet to be supported.",
-            slot.notes,
-        )
+        assert slot.range == ANY_CLASS_DEF.name
+        assert slot.any_of == [
+            AnonymousSlotExpression(range="integer"),
+            AnonymousSlotExpression(range="Bar1"),
+            AnonymousSlotExpression(range="string"),
+        ]
 
         # === Unions of two models ===
         class Foo2(BaseModel):
@@ -924,6 +924,20 @@ class TestSlotGenerator:
         assert slot.range == ANY_CLASS_DEF.name
         assert slot.any_of == [
             AnonymousSlotExpression(range="Bar1"),
+            AnonymousSlotExpression(range="Bar2"),
+        ]
+
+        # === Union of base types, lists, and models ===
+        class Foo3(BaseModel):
+            x: Union[int, list[Bar1], list[str], Bar2]
+
+        slot = translate_field_to_slot(Foo3, "x")
+
+        assert slot.range == ANY_CLASS_DEF.name
+        assert slot.any_of == [
+            AnonymousSlotExpression(range="integer"),
+            AnonymousSlotExpression(range="Bar1", multivalued=True),
+            AnonymousSlotExpression(range="string", multivalued=True),
             AnonymousSlotExpression(range="Bar2"),
         ]
 
