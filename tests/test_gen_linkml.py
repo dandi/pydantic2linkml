@@ -941,6 +941,22 @@ class TestSlotGenerator:
             AnonymousSlotExpression(range="Bar2"),
         ]
 
+        # === Nested unions ===
+        class Foo4(BaseModel):
+            x: Union[int, Union[str, Bar1]]
+
+        slot = translate_field_to_slot(Foo4, "x")
+        assert slot == SlotDefinition(
+            name="x",
+            range=ANY_CLASS_DEF.name,
+            required=True,
+            any_of=[
+                AnonymousSlotExpression(range="integer"),
+                AnonymousSlotExpression(range="string"),
+                AnonymousSlotExpression(range="Bar1"),
+            ],
+        )
+
     def test_tagged_union_schema(self):
         class Cat(BaseModel):
             pet_type: Literal["cat"]
