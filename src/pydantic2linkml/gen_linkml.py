@@ -505,8 +505,6 @@ class SlotGenerator:
         }
         return AnonymousSlotExpression(**ase_kwargs)
 
-
-
     if pydantic_version >= version.parse("2.10"):
 
         def _invalid_schema(self, schema: core_schema.InvalidSchema) -> None:
