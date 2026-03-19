@@ -895,7 +895,12 @@ class TestSlotGenerator:
         ]
         slot = SlotGenerator(field_schema).generate()
 
-        assert slot.range is None
+        # `notes=slot.notes` is used instead of `notes=ANY` because
+        # `SlotDefinition.__eq__` serializes fields before comparing, which
+        # causes `unittest.mock.ANY` to be treated as the literal string
+        # `'<ANY>'` rather than a wildcard. The note content is checked
+        # separately below.
+        assert slot == SlotDefinition(name="x", required=True, notes=slot.notes)
         assert in_exactly_one_string(
             "The union core schema contains a tuple as a choice. "
             "Tuples as choices are yet to be supported.",
@@ -906,40 +911,62 @@ class TestSlotGenerator:
         class Foo1(BaseModel):
             x: Union[int, Bar1, str]
 
-        slot = translate_field_to_slot(Foo1, "x")
-
-        assert slot.range == ANY_CLASS_DEF.name
-        assert slot.any_of == [
-            AnonymousSlotExpression(range="integer"),
-            AnonymousSlotExpression(range="Bar1"),
-            AnonymousSlotExpression(range="string"),
-        ]
+        assert translate_field_to_slot(Foo1, "x") == SlotDefinition(
+            name="x",
+            range=ANY_CLASS_DEF.name,
+            required=True,
+            any_of=[
+                AnonymousSlotExpression(range="integer"),
+                AnonymousSlotExpression(range="Bar1"),
+                AnonymousSlotExpression(range="string"),
+            ],
+        )
 
         # === Unions of two models ===
         class Foo2(BaseModel):
             x: Union[Bar1, Bar2]
 
-        slot = translate_field_to_slot(Foo2, "x")
-
-        assert slot.range == ANY_CLASS_DEF.name
-        assert slot.any_of == [
-            AnonymousSlotExpression(range="Bar1"),
-            AnonymousSlotExpression(range="Bar2"),
-        ]
+        assert translate_field_to_slot(Foo2, "x") == SlotDefinition(
+            name="x",
+            range=ANY_CLASS_DEF.name,
+            required=True,
+            any_of=[
+                AnonymousSlotExpression(range="Bar1"),
+                AnonymousSlotExpression(range="Bar2"),
+            ],
+        )
 
         # === Union of base types, lists, and models ===
         class Foo3(BaseModel):
             x: Union[int, list[Bar1], list[str], Bar2]
 
-        slot = translate_field_to_slot(Foo3, "x")
+        assert translate_field_to_slot(Foo3, "x") == SlotDefinition(
+            name="x",
+            range=ANY_CLASS_DEF.name,
+            required=True,
+            any_of=[
+                AnonymousSlotExpression(range="integer"),
+                AnonymousSlotExpression(range="Bar1", multivalued=True),
+                AnonymousSlotExpression(range="string", multivalued=True),
+                AnonymousSlotExpression(range="Bar2"),
+            ],
+        )
 
-        assert slot.range == ANY_CLASS_DEF.name
-        assert slot.any_of == [
-            AnonymousSlotExpression(range="integer"),
-            AnonymousSlotExpression(range="Bar1", multivalued=True),
-            AnonymousSlotExpression(range="string", multivalued=True),
-            AnonymousSlotExpression(range="Bar2"),
-        ]
+        # === Nested unions ===
+        class Foo4(BaseModel):
+            x: Union[int, Union[str, Bar1]]
+
+        slot = translate_field_to_slot(Foo4, "x")
+        assert slot == SlotDefinition(
+            name="x",
+            range=ANY_CLASS_DEF.name,
+            required=True,
+            any_of=[
+                AnonymousSlotExpression(range="integer"),
+                AnonymousSlotExpression(range="string"),
+                AnonymousSlotExpression(range="Bar1"),
+            ],
+        )
 
     def test_tagged_union_schema(self):
         class Cat(BaseModel):
