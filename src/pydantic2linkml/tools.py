@@ -9,7 +9,7 @@ from dataclasses import fields
 from enum import Enum
 from operator import attrgetter, itemgetter
 from types import ModuleType
-from typing import Any, NamedTuple, Optional, TypeVar, cast
+from typing import Any, NamedTuple, Optional, TypeVar, cast, overload
 
 import yaml
 from linkml_runtime.linkml_model import SchemaDefinition, SlotDefinition
@@ -150,13 +150,17 @@ def strip_function_schema(
 # strip the outermost unneeded wrapping schema. The set of schema types deemed as
 # unneeded may change in the future if we are able to harvest the information in any of
 # the wrapping schema types.
+_strip_core_schema = cast(
+    Callable[[core_schema.CoreSchema], core_schema.CoreSchema],
+    strip_function_schema,
+)
 UNNEEDED_WRAPPING_SCHEMA_TYPE_TO_STRIP_FUNC: dict[
     str, Callable[[core_schema.CoreSchema], core_schema.CoreSchema]
 ] = {
-    "function-before": strip_function_schema,
-    "function-after": strip_function_schema,
-    "function-wrap": strip_function_schema,
-    "function-plain": strip_function_schema,
+    "function-before": _strip_core_schema,
+    "function-after": _strip_core_schema,
+    "function-wrap": _strip_core_schema,
+    "function-plain": _strip_core_schema,
 }
 
 
@@ -287,11 +291,26 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
+@overload
+def bucketize(
+    items: Iterable[T],
+    key_func: Callable[[T], K],
+) -> defaultdict[K, list[T]]: ...
+
+
+@overload
+def bucketize(
+    items: Iterable[T],
+    key_func: Callable[[T], K],
+    value_func: Callable[[T], V],
+) -> defaultdict[K, list[V]]: ...
+
+
 def bucketize(
     items: Iterable[T],
     key_func: Callable[[T], K],
     value_func: Optional[Callable[[T], V]] = None,
-) -> defaultdict[K, list[V]]:
+) -> defaultdict[K, list[Any]]:
     """
     Bucketize items based on a key function
 
@@ -302,7 +321,7 @@ def bucketize(
     :return: A dictionary with keys as the results of the key function and values as
         the list of (transformed) items that have the corresponding key
     """
-    buckets: defaultdict[K, list[T]] = defaultdict(list)
+    buckets: defaultdict[K, list[Any]] = defaultdict(list)
     for item in items:
         key = key_func(item)
         buckets[key].append(item if value_func is None else value_func(item))
