@@ -62,7 +62,7 @@ def main(
             ) from e
     yml = add_section_breaks(yml)
     if not output_file:
-        print(yml)  # noqa: T201
+        print(yml, end='')  # noqa: T201
     else:
         with output_file.open("w") as f:
             f.write(yml)
