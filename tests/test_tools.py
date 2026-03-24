@@ -13,12 +13,13 @@ from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
     NameCollisionError,
-    OverlayContentError,
+    YAMLContentError,
     SlotExtensionError,
 )
 from pydantic2linkml.tools import (
     add_section_breaks,
     apply_schema_overlay,
+    apply_yaml_deep_merge,
     bucketize,
     ensure_unique_names,
     fetch_defs,
@@ -35,8 +36,17 @@ from pydantic2linkml.tools import (
     sort_dict,
 )
 
-# A minimal YAML dict suitable as schema_yml input for apply_schema_overlay tests
-SAMPLE_SCHEMA_YML = "id: https://example.com/test\nname: original-name\n"
+# A minimal YAML dict suitable as schema_yml input for apply_schema_overlay
+# and apply_yaml_deep_merge tests
+SAMPLE_SCHEMA_YML = (
+    "id: https://example.com/test\n"
+    "name: original-name\n"
+    "imports:\n"
+    "  - linkml:types\n"
+    "classes:\n"
+    "  Foo:\n"
+    "    description: original description\n"
+)
 
 
 def test_get_parent_models():
@@ -687,7 +697,7 @@ class TestApplySchemaOverlay:
     ):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text(overlay_content)
-        with pytest.raises(OverlayContentError):
+        with pytest.raises(YAMLContentError):
             apply_schema_overlay(
                 schema_yml=SAMPLE_SCHEMA_YML, overlay_file=overlay_file
             )
@@ -724,6 +734,131 @@ class TestApplySchemaOverlay:
         overlay_file.write_text("title: \u00dc n\u00ef c\u00f6d\u00e9\n")
         result = apply_schema_overlay(
             schema_yml=SAMPLE_SCHEMA_YML, overlay_file=overlay_file
+        )
+        assert yaml.safe_load(result)["title"] == "\u00dc n\u00ef c\u00f6d\u00e9"
+
+
+class TestApplyYamlDeepMerge:
+    @pytest.mark.parametrize(
+        "merge_content, expected",
+        [
+            pytest.param(
+                "name: new-name\n",
+                {
+                    "id": "https://example.com/test",
+                    "name": "new-name",
+                    "imports": ["linkml:types"],
+                    "classes": {"Foo": {"description": "original description"}},
+                },
+                id="top_level_scalar_override",
+            ),
+            pytest.param(
+                # Nested dict merge: Foo.title added, Foo.description preserved,
+                # Bar added alongside Foo
+                "classes:\n"
+                "  Foo:\n"
+                "    title: new title\n"
+                "  Bar:\n"
+                "    description: bar desc\n",
+                {
+                    "id": "https://example.com/test",
+                    "name": "original-name",
+                    "imports": ["linkml:types"],
+                    "classes": {
+                        "Foo": {
+                            "description": "original description",
+                            "title": "new title",
+                        },
+                        "Bar": {"description": "bar desc"},
+                    },
+                },
+                id="nested_dict_merge",
+            ),
+            pytest.param(
+                # Nested dict override: Foo.description replaced
+                "classes:\n  Foo:\n    description: new description\n",
+                {
+                    "id": "https://example.com/test",
+                    "name": "original-name",
+                    "imports": ["linkml:types"],
+                    "classes": {"Foo": {"description": "new description"}},
+                },
+                id="nested_dict_override",
+            ),
+            pytest.param(
+                # Appending to list: always_merger appends elements to lists
+                "imports:\n  - linkml:extra\n",
+                {
+                    "id": "https://example.com/test",
+                    "name": "original-name",
+                    "imports": ["linkml:types", "linkml:extra"],
+                    "classes": {"Foo": {"description": "original description"}},
+                },
+                id="append_to_list",
+            ),
+        ],
+    )
+    def test_merge_applied(self, tmp_path: Path, merge_content, expected):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text(merge_content)
+        result = apply_yaml_deep_merge(
+            schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file
+        )
+        assert yaml.safe_load(result) == expected
+
+    @pytest.mark.parametrize(
+        "get_path",
+        [
+            pytest.param(lambda p: p / "no-such-file.yaml", id="nonexistent_file"),
+            pytest.param(lambda p: p, id="directory"),
+        ],
+    )
+    def test_invalid_merge_file_raises_validation_error(self, tmp_path: Path, get_path):
+        with pytest.raises(ValidationError):
+            apply_yaml_deep_merge(
+                schema_yml=SAMPLE_SCHEMA_YML, merge_file=get_path(tmp_path)
+            )
+
+    @pytest.mark.parametrize(
+        "merge_content",
+        [
+            pytest.param("- item1\n- item2\n", id="list"),
+            pytest.param("", id="null"),
+        ],
+    )
+    def test_non_dict_merge_raises_yaml_content_error(
+        self, tmp_path: Path, merge_content
+    ):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text(merge_content)
+        with pytest.raises(YAMLContentError):
+            apply_yaml_deep_merge(schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file)
+
+    def test_invalid_yaml_in_merge_file_raises_yaml_error(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("key: [unclosed\n")
+        with pytest.raises(yaml.YAMLError):
+            apply_yaml_deep_merge(schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file)
+
+    def test_schema_yml_not_dict_raises_value_error(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("name: new-name\n")
+        with pytest.raises(ValueError):
+            apply_yaml_deep_merge(
+                schema_yml="- item1\n- item2\n", merge_file=merge_file
+            )
+
+    def test_schema_yml_invalid_yaml_raises_value_error(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("name: new-name\n")
+        with pytest.raises(ValueError):
+            apply_yaml_deep_merge(schema_yml="key: [unclosed\n", merge_file=merge_file)
+
+    def test_unicode_content_preserved(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("title: \u00dc n\u00ef c\u00f6d\u00e9\n")
+        result = apply_yaml_deep_merge(
+            schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file
         )
         assert yaml.safe_load(result)["title"] == "\u00dc n\u00ef c\u00f6d\u00e9"
 

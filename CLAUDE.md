@@ -65,18 +65,41 @@ pydantic2linkml [OPTIONS] MODULE_NAMES...
 pydantic2linkml -o output.yml -l INFO dandischema.models
 ```
 
-Options: `--output-file`/`-o` (path), `--log-level`/`-l` (default: WARNING).
+Options:
+
+- `--output-file`/`-o` (path) — write output to a file instead of stdout
+- `--merge-file`/`-M` (path) — deep-merge a YAML file into the generated
+  schema; values from the file win on conflict; no field filtering applied
+- `--overlay-file`/`-O` (path) — shallow-merge a YAML file into the
+  generated schema; only `SchemaDefinition` fields are applied; unknown
+  keys are skipped with a warning
+- `--log-level`/`-l` (default: WARNING)
 
 ## Architecture
 
 ### Core Translation Pipeline
 
-1. **`tools.py`** — Low-level utilities for introspecting Pydantic internals:
+1. **`tools.py`** — Low-level utilities for introspecting Pydantic internals
+   and post-processing the generated schema YAML:
    - `get_all_modules()` — imports modules and collects them with submodules
-   - `fetch_defs()` — extracts `BaseModel` subclasses and `Enum` subclasses from modules
-   - `get_field_schema()` / `get_locally_defined_fields()` — extracts resolved `pydantic_core.CoreSchema` objects for fields, distinguishing newly defined vs. overriding fields
-   - `FieldSchema` (NamedTuple) — bundles a field's core schema, its resolution context, field name, `FieldInfo`, and owning model
-   - `resolve_ref_schema()` — resolves `definition-ref` and `definitions` schema types to concrete schemas
+   - `fetch_defs()` — extracts `BaseModel` subclasses and `Enum` subclasses
+     from modules
+   - `get_field_schema()` / `get_locally_defined_fields()` — extracts
+     resolved `pydantic_core.CoreSchema` objects for fields, distinguishing
+     newly defined vs. overriding fields
+   - `FieldSchema` (NamedTuple) — bundles a field's core schema, its
+     resolution context, field name, `FieldInfo`, and owning model
+   - `resolve_ref_schema()` — resolves `definition-ref` and `definitions`
+     schema types to concrete schemas
+   - `apply_schema_overlay(schema_yml, overlay_file)` — shallow-merges a
+     YAML file into a schema YAML string; restricts keys to
+     `SchemaDefinition` fields
+   - `apply_yaml_deep_merge(schema_yml, merge_file)` — deep-merges a YAML
+     file into a schema YAML string using `deepmerge`; no field filtering
+   - `remove_schema_key_duplication(yml)` — strips redundant `name`/`text`
+     fields from serialized LinkML YAML
+   - `add_section_breaks(yml)` — inserts blank lines before top-level
+     sections
 
 2. **`gen_linkml.py`** — Main translation logic:
    - `translate_defs(module_names)` — top-level entry point; loads modules, fetches defs, runs `LinkmlGenerator`
@@ -84,13 +107,19 @@ Options: `--output-file`/`-o` (path), `--log-level`/`-l` (default: WARNING).
    - `SlotGenerator` — single-use class; translates a single Pydantic `CoreSchema` into a `SlotDefinition`. Dispatches on schema `type` strings via handler methods. Handles nesting, optionality, lists, unions, literals, UUIDs, dates, etc.
    - `any_class_def` — module-level `ClassDefinition` constant for the LinkML `Any` type
 
-3. **`cli/`** — Typer-based CLI wrapping `translate_defs`; `cli/__init__.py` defines the `app` and `main` command.
+3. **`cli/`** — Typer-based CLI wrapping `translate_defs`; `cli/__init__.py`
+   defines the `app` and `main` command. After translation the pipeline is:
+   dump YAML → `remove_schema_key_duplication` → optional `-M` deep merge
+   → optional `-O` overlay → `add_section_breaks` → output.
 
 4. **`exceptions.py`** — Custom exceptions:
    - `NameCollisionError` — duplicate class/enum names across modules
    - `GeneratorReuseError` — attempting to reuse a single-use generator
    - `TranslationNotImplementedError` — schema type not yet handled
-   - `SlotExtensionError` — cannot extend a base slot to match a target via slot_usage
+   - `SlotExtensionError` — cannot extend a base slot to match a target
+     via slot_usage
+   - `YAMLContentError` — YAML file content is not what is expected (e.g.,
+     not a mapping)
 
 ### Key Design Patterns
 

@@ -6,7 +6,11 @@ from typer.testing import CliRunner
 
 from pydantic2linkml.cli import app, main
 
-runner = CliRunner()
+# Use a wide terminal so Typer's Rich error boxes are never wrapped across lines.
+# terminal_width kwarg is not sufficient because Typer's Rich-based error
+# formatting reads terminal width from shutil.get_terminal_size(), which
+# respects the COLUMNS environment variable.
+runner = CliRunner(env={"COLUMNS": "200"})
 
 _MOCK_SCHEMA = SchemaDefinition(id="https://example.com/test", name="test-schema")
 
@@ -58,3 +62,47 @@ class TestCliOverlay:
         result = runner.invoke(app, ["dandischema.models", "-O", str(overlay_file)])
         assert result.exit_code == 0
         assert "not_a_field" not in result.output
+
+
+class TestCliDeepMerge:
+    @pytest.fixture(autouse=True)
+    def mock_translate_defs(self, mocker):
+        mocker.patch("pydantic2linkml.cli.translate_defs", return_value=_MOCK_SCHEMA)
+
+    def test_valid_field(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("name: my-name\n")
+        result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
+        assert result.exit_code == 0
+        assert "name: my-name" in result.output
+
+    def test_nested_merge(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("classes:\n  Foo:\n    description: test-desc\n")
+        result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
+        assert result.exit_code == 0
+        assert "description: test-desc" in result.output
+        # Original top-level fields are preserved
+        assert "id: https://example.com/test" in result.output
+
+    def test_nonexistent_file(self, tmp_path: Path):
+        result = runner.invoke(
+            app,
+            ["dandischema.models", "-M", str(tmp_path / "no-such-file.yaml")],
+        )
+        assert result.exit_code == 2
+        assert "merge file path is invalid" in result.output
+
+    def test_non_mapping(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("- item1\n")
+        result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
+        assert result.exit_code == 2
+        assert "does not contain a valid YAML mapping" in result.output
+
+    def test_invalid_yaml(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("key: [unclosed\n")
+        result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
+        assert result.exit_code == 2
+        assert "does not contain valid YAML" in result.output

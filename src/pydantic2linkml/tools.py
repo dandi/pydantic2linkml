@@ -23,7 +23,7 @@ from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
     NameCollisionError,
-    OverlayContentError,
+    YAMLContentError,
     SlotExtensionError,
 )
 
@@ -543,7 +543,7 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     :return: YAML string with the overlay applied, keys ordered to match
         SchemaDefinition field order
     :raises ValueError: If ``schema_yml`` does not deserialize to a dict
-    :raises OverlayContentError: If the overlay file does not contain a YAML
+    :raises YAMLContentError: If the overlay file does not contain a YAML
         mapping
     """
     schema_dict = yaml.safe_load(schema_yml)
@@ -556,7 +556,7 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
         overlay = yaml.safe_load(f)
 
     if not isinstance(overlay, dict):
-        raise OverlayContentError(
+        raise YAMLContentError(
             f"Overlay file {overlay_file} must contain a YAML mapping"
         )
 
@@ -578,6 +578,46 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     ordered = {k: schema_dict[k] for k in sd_field_names if k in schema_dict}
 
     return yaml.dump(ordered, allow_unicode=True, sort_keys=False)
+
+
+@validate_call
+def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
+    """Deep-merge a YAML file into a serialized schema YAML string.
+
+    Values from the merge file win on conflict. The merge is unrestricted —
+    no field filtering is applied.
+
+    :param schema_yml: YAML string of a valid LinkML schema
+    :param merge_file: Path to an existing YAML file containing a mapping
+    :return: YAML string with the deep merge applied
+    :raises ValueError: If ``schema_yml`` does not contain valid YAML or does
+        not deserialize to a dict
+    :raises yaml.YAMLError: If the merge file does not contain valid YAML
+    :raises YAMLContentError: If the merge file does not contain a YAML mapping
+    """
+    from deepmerge import always_merger
+
+    try:
+        schema_dict = yaml.safe_load(schema_yml)
+    except yaml.YAMLError as e:
+        raise ValueError(f"schema_yml does not contain valid YAML: {e}") from e
+
+    if not isinstance(schema_dict, dict):
+        raise ValueError(
+            f"schema_yml did not deserialize to a dict: {type(schema_dict)}"
+        )
+
+    with merge_file.open() as f:
+        merge_dict = yaml.safe_load(f)  # raises yaml.YAMLError on invalid YAML
+
+    if not isinstance(merge_dict, dict):
+        raise YAMLContentError(f"Merge file {merge_file} must contain a YAML mapping")
+
+    return yaml.dump(
+        always_merger.merge(schema_dict, merge_dict),
+        allow_unicode=True,
+        sort_keys=False,
+    )
 
 
 def remove_schema_key_duplication(yml: str) -> str:
