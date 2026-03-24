@@ -580,6 +580,50 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     return yaml.dump(ordered, allow_unicode=True, sort_keys=False)
 
 
+@validate_call
+def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
+    """Deep-merge a YAML file into a serialized schema YAML string.
+
+    Values from the merge file win on conflict. The merge is unrestricted —
+    no field filtering is applied.
+
+    :param schema_yml: YAML string of a valid LinkML schema
+    :param merge_file: Path to an existing YAML file containing a mapping
+    :return: YAML string with the deep merge applied
+    :raises ValueError: If ``schema_yml`` does not contain valid YAML or does
+        not deserialize to a dict
+    :raises yaml.YAMLError: If the merge file does not contain valid YAML
+    :raises YAMLContentError: If the merge file does not contain a YAML mapping
+    """
+    from deepmerge import always_merger
+
+    try:
+        schema_dict = yaml.safe_load(schema_yml)
+    except yaml.YAMLError as e:
+        raise ValueError(
+            f"schema_yml does not contain valid YAML: {e}"
+        ) from e
+
+    if not isinstance(schema_dict, dict):
+        raise ValueError(
+            f"schema_yml did not deserialize to a dict: {type(schema_dict)}"
+        )
+
+    with merge_file.open() as f:
+        merge_dict = yaml.safe_load(f)  # raises yaml.YAMLError on invalid YAML
+
+    if not isinstance(merge_dict, dict):
+        raise YAMLContentError(
+            f"Merge file {merge_file} must contain a YAML mapping"
+        )
+
+    return yaml.dump(
+        always_merger.merge(schema_dict, merge_dict),
+        allow_unicode=True,
+        sort_keys=False,
+    )
+
+
 def remove_schema_key_duplication(yml: str) -> str:
     """Remove redundant name/text fields from a valid serialized LinkML schema.
 
