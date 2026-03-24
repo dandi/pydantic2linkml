@@ -78,11 +78,7 @@ class TestCliDeepMerge:
 
     def test_nested_merge(self, tmp_path: Path):
         merge_file = tmp_path / "merge.yaml"
-        merge_file.write_text(
-            "classes:\n"
-            "  Foo:\n"
-            "    description: test-desc\n"
-        )
+        merge_file.write_text("classes:\n  Foo:\n    description: test-desc\n")
         result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
         assert result.exit_code == 0
         assert "description: test-desc" in result.output

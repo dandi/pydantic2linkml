@@ -600,9 +600,7 @@ def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
     try:
         schema_dict = yaml.safe_load(schema_yml)
     except yaml.YAMLError as e:
-        raise ValueError(
-            f"schema_yml does not contain valid YAML: {e}"
-        ) from e
+        raise ValueError(f"schema_yml does not contain valid YAML: {e}") from e
 
     if not isinstance(schema_dict, dict):
         raise ValueError(
@@ -613,9 +611,7 @@ def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
         merge_dict = yaml.safe_load(f)  # raises yaml.YAMLError on invalid YAML
 
     if not isinstance(merge_dict, dict):
-        raise YAMLContentError(
-            f"Merge file {merge_file} must contain a YAML mapping"
-        )
+        raise YAMLContentError(f"Merge file {merge_file} must contain a YAML mapping")
 
     return yaml.dump(
         always_merger.merge(schema_dict, merge_dict),

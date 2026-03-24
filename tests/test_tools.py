@@ -776,7 +776,7 @@ class TestApplyYamlDeepMerge:
             ),
             pytest.param(
                 # Nested dict override: Foo.description replaced
-                "classes:\n" "  Foo:\n" "    description: new description\n",
+                "classes:\n  Foo:\n    description: new description\n",
                 {
                     "id": "https://example.com/test",
                     "name": "original-name",
@@ -852,9 +852,7 @@ class TestApplyYamlDeepMerge:
         merge_file = tmp_path / "merge.yaml"
         merge_file.write_text("name: new-name\n")
         with pytest.raises(ValueError):
-            apply_yaml_deep_merge(
-                schema_yml="key: [unclosed\n", merge_file=merge_file
-            )
+            apply_yaml_deep_merge(schema_yml="key: [unclosed\n", merge_file=merge_file)
 
     def test_unicode_content_preserved(self, tmp_path: Path):
         merge_file = tmp_path / "merge.yaml"
