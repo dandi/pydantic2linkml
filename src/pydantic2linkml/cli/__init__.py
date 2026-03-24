@@ -7,7 +7,7 @@ from linkml_runtime.dumpers import yaml_dumper
 from pydantic import ValidationError
 
 from pydantic2linkml.cli.tools import LogLevel
-from pydantic2linkml.exceptions import OverlayContentError
+from pydantic2linkml.exceptions import YAMLContentError
 from pydantic2linkml.gen_linkml import translate_defs
 from pydantic2linkml.tools import (
     add_section_breaks,
@@ -55,7 +55,7 @@ def main(
                 f"The overlay file path is invalid: {e}",
                 param_hint="'--overlay-file'",
             ) from e
-        except OverlayContentError as e:
+        except YAMLContentError as e:
             raise typer.BadParameter(
                 f"The overlay file does not contain a valid YAML mapping: {e}",
                 param_hint="'--overlay-file'",

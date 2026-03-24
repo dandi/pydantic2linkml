@@ -13,7 +13,7 @@ from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
     NameCollisionError,
-    OverlayContentError,
+    YAMLContentError,
     SlotExtensionError,
 )
 from pydantic2linkml.tools import (
@@ -687,7 +687,7 @@ class TestApplySchemaOverlay:
     ):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text(overlay_content)
-        with pytest.raises(OverlayContentError):
+        with pytest.raises(YAMLContentError):
             apply_schema_overlay(
                 schema_yml=SAMPLE_SCHEMA_YML, overlay_file=overlay_file
             )

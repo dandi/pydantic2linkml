@@ -23,7 +23,7 @@ from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
     NameCollisionError,
-    OverlayContentError,
+    YAMLContentError,
     SlotExtensionError,
 )
 
@@ -543,7 +543,7 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     :return: YAML string with the overlay applied, keys ordered to match
         SchemaDefinition field order
     :raises ValueError: If ``schema_yml`` does not deserialize to a dict
-    :raises OverlayContentError: If the overlay file does not contain a YAML
+    :raises YAMLContentError: If the overlay file does not contain a YAML
         mapping
     """
     schema_dict = yaml.safe_load(schema_yml)
@@ -556,7 +556,7 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
         overlay = yaml.safe_load(f)
 
     if not isinstance(overlay, dict):
-        raise OverlayContentError(
+        raise YAMLContentError(
             f"Overlay file {overlay_file} must contain a YAML mapping"
         )
 

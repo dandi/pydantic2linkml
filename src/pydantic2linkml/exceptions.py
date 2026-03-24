@@ -106,7 +106,7 @@ class SlotExtensionError(Exception):
         )
 
 
-class OverlayContentError(ValueError):
+class YAMLContentError(ValueError):
     """
-    Raise when the content of an overlay file is not a valid YAML mapping
+    Raise when the content of a YAML file is not what is expected
     """
