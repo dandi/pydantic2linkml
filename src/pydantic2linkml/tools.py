@@ -1,3 +1,4 @@
+import functools
 import importlib
 import inspect
 import logging
@@ -7,6 +8,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import fields
 from enum import Enum
+from importlib.resources import files as resource_files
 from operator import attrgetter, itemgetter
 from types import ModuleType
 from typing import Any, NamedTuple, Optional, TypeVar, cast
@@ -204,9 +206,9 @@ def get_model_schema(model: type[BaseModel]) -> core_schema.ModelSchema:
         else:
             model_schema = inner_schema
 
-    assert (
-        model_schema["type"] == "model"
-    ), "Assumption about how model schema is stored is wrong."
+    assert model_schema["type"] == "model", (
+        "Assumption about how model schema is stored is wrong."
+    )
 
     return cast(core_schema.ModelSchema, model_schema)
 
@@ -537,31 +539,63 @@ def get_slot_usage_entry(
     )
 
 
+@functools.cache
+def _get_meta_schema_validator():
+    """Return a cached LinkML meta-schema validator.
+
+    The validator is initialized lazily on first call (importing
+    ``linkml.validator`` is slow) and then cached for reuse.
+    ``closed=True`` adds ``additionalProperties: false`` to every object
+    type in the generated JSON Schema, so unknown field names are caught
+    as validation errors.
+    """
+    from linkml.validator import Validator
+    from linkml.validator.plugins import JsonschemaValidationPlugin
+
+    meta_schema_path = str(
+        resource_files("linkml_runtime.linkml_model.model.schema").joinpath("meta.yaml")
+    )
+    return Validator(
+        meta_schema_path,
+        validation_plugins=[JsonschemaValidationPlugin(closed=True)],
+    )
+
+
 def canonicalize_schema_yml(yml: str) -> str:
     """Canonicalize a YAML string as a LinkML schema via a round-trip.
 
-    Deserializes ``yml`` into a ``SchemaDefinition`` object and
-    re-serializes it.  The round-trip serves two purposes:
+    Deserializes ``yml`` into a ``SchemaDefinition`` object,
+    re-serializes it to canonical YAML, then validates the canonical
+    output against the LinkML meta schema.  This serves two purposes:
 
-    * **Unknown-field detection** — ``yaml_loader`` raises ``TypeError``
-      for any field name unknown to ``SchemaDefinition`` or its nested
-      objects; this function catches that and re-raises it as
-      ``InvalidLinkMLSchemaError``.  Note: wrong-type values for known
-      fields are generally not detected.
     * **Canonical ordering** — the output keys follow the same order
       produced by serializing a freshly constructed ``SchemaDefinition``.
+    * **Validation** — the canonical YAML is validated against the
+      LinkML meta schema.  Unknown field names and wrong-type values for
+      known fields are caught and re-raised as ``InvalidLinkMLSchemaError``.
 
     :param yml: A YAML string to canonicalize as a LinkML schema.
-    :return: Canonically ordered YAML string representing the schema.
-    :raises InvalidLinkMLSchemaError: If ``yml`` contains field names
-        unknown to ``SchemaDefinition`` or any of its nested objects.
+    :return: Canonically ordered, validated YAML string representing the
+        schema.
+    :raises InvalidLinkMLSchemaError: If the resulting schema does not
+        conform to the LinkML meta schema (unknown field names,
+        wrong-type values, etc.).
     """
     try:
         sd = yaml_loader.loads(yml, target_class=SchemaDefinition)
     except TypeError as e:
-        raise InvalidLinkMLSchemaError(str(e)) from e
+        raise InvalidLinkMLSchemaError(f"Unknown field in schema: {e}") from e
 
-    return yaml_dumper.dumps(sd)
+    canonical = yaml_dumper.dumps(sd)
+
+    validator = _get_meta_schema_validator()
+    report = validator.validate(yaml.safe_load(canonical), "schema_definition")
+    if report.results:
+        raise InvalidLinkMLSchemaError(
+            "Schema validation failed: " + "; ".join(r.message for r in report.results)
+        )
+
+    return canonical
 
 
 @validate_call
@@ -569,14 +603,9 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     """Apply an overlay YAML file onto a serialized schema YAML string.
 
     All keys from the overlay are applied without filtering.  The result
-    is then round-tripped through ``SchemaDefinition`` via
-    ``canonicalize_schema_yml``, which reorders keys canonically and
-    raises ``InvalidLinkMLSchemaError`` for any field names unknown to
-    ``SchemaDefinition`` or its nested objects.
-
-    Note: The result is always a valid YAML file but may not be a valid
-    LinkML schema — it is the user's responsibility to supply an overlay
-    that produces a valid schema.
+    is then passed through ``canonicalize_schema_yml``, which reorders
+    keys canonically and validates the output against the LinkML meta
+    schema.
 
     :param schema_yml: YAML string of a valid LinkML schema
     :param overlay_file: Path to an existing overlay YAML file
@@ -585,8 +614,8 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     :raises ValueError: If ``schema_yml`` does not deserialize to a dict
     :raises YAMLContentError: If the overlay file does not contain a YAML
         mapping
-    :raises InvalidLinkMLSchemaError: If the overlay introduces field
-        names unknown to ``SchemaDefinition`` or its nested objects
+    :raises InvalidLinkMLSchemaError: If the result does not conform to
+        the LinkML meta schema
     """
     schema_dict = yaml.safe_load(schema_yml)
     if not isinstance(schema_dict, dict):
@@ -613,24 +642,20 @@ def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
     """Deep-merge a YAML file into a serialized schema YAML string.
 
     Values from the merge file win on conflict. The merge is unrestricted —
-    no field filtering is applied.  The result is then round-tripped
-    through ``SchemaDefinition`` via ``canonicalize_schema_yml``, which
-    reorders keys canonically and raises ``InvalidLinkMLSchemaError`` for
-    any field names unknown to ``SchemaDefinition`` or its nested objects.
-
-    Note: The result is always a valid YAML file but may not be a valid
-    LinkML schema — it is the user's responsibility to supply a merge file
-    that produces a valid schema.
+    no field filtering is applied.  The result is then passed through
+    ``canonicalize_schema_yml``, which reorders keys canonically and
+    validates the output against the LinkML meta schema.
 
     :param schema_yml: YAML string of a valid LinkML schema
     :param merge_file: Path to an existing YAML file containing a mapping
     :return: Canonical YAML string with the deep merge applied
-    :raises ValueError: If ``schema_yml`` does not contain valid YAML or does
-        not deserialize to a dict
+    :raises ValueError: If ``schema_yml`` does not contain valid YAML or
+        does not deserialize to a dict
     :raises yaml.YAMLError: If the merge file does not contain valid YAML
-    :raises YAMLContentError: If the merge file does not contain a YAML mapping
-    :raises InvalidLinkMLSchemaError: If the merge introduces field names
-        unknown to ``SchemaDefinition`` or its nested objects
+    :raises YAMLContentError: If the merge file does not contain a YAML
+        mapping
+    :raises InvalidLinkMLSchemaError: If the result does not conform to
+        the LinkML meta schema
     """
     from deepmerge import always_merger
 

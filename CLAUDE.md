@@ -69,10 +69,11 @@ Options:
 
 - `--output-file`/`-o` (path) — write output to a file instead of stdout
 - `--merge-file`/`-M` (path) — deep-merge a YAML file into the generated
-  schema; values from the file win on conflict; unknown field names raise
-  an error
+  schema; values from the file win on conflict; the result is validated
+  against the LinkML meta schema
 - `--overlay-file`/`-O` (path) — shallow-merge a YAML file into the
-  generated schema; unknown field names raise an error
+  generated schema; the result is validated against the LinkML meta
+  schema
 - `--log-level`/`-l` (default: WARNING)
 
 ## Architecture
@@ -92,15 +93,17 @@ Options:
    - `resolve_ref_schema()` — resolves `definition-ref` and `definitions`
      schema types to concrete schemas
    - `canonicalize_schema_yml(yml)` — round-trips a YAML string through
-     `SchemaDefinition` to produce canonically ordered output and detect
-     unknown field names (raises `InvalidLinkMLSchemaError`); note that
-     wrong-type values for known fields are generally not detected
+     `SchemaDefinition` for canonical key ordering, then validates the
+     result against the LinkML meta schema via `linkml.validator`
+     (raises `InvalidLinkMLSchemaError` on unknown fields or wrong-type
+     values); the meta-schema validator is lazily initialized and cached
+     via `_get_meta_schema_validator()`
    - `apply_schema_overlay(schema_yml, overlay_file)` — shallow-merges a
      YAML file into a schema YAML string; no field filtering; calls
-     `canonicalize_schema_yml` to reorder keys and detect unknown fields
+     `canonicalize_schema_yml` to reorder keys and validate the result
    - `apply_yaml_deep_merge(schema_yml, merge_file)` — deep-merges a YAML
      file into a schema YAML string using `deepmerge`; calls
-     `canonicalize_schema_yml` to reorder keys and detect unknown fields
+     `canonicalize_schema_yml` to reorder keys and validate the result
    - `remove_schema_key_duplication(yml)` — strips redundant `name`/`text`/
      `prefix_prefix` fields from serialized LinkML YAML
    - `add_section_breaks(yml)` — inserts blank lines before top-level
@@ -125,8 +128,9 @@ Options:
      via slot_usage
    - `YAMLContentError` — YAML file content is not what is expected (e.g.,
      not a mapping)
-   - `InvalidLinkMLSchemaError` — YAML string contains field names unknown
-     to LinkML (raised by `canonicalize_schema_yml`)
+   - `InvalidLinkMLSchemaError` — schema does not conform to the LinkML
+     meta schema (unknown fields, wrong-type values, etc.); raised by
+     `canonicalize_schema_yml`
 
 ### Key Design Patterns
 

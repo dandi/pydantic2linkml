@@ -21,6 +21,7 @@ from pydantic2linkml.tools import (
     apply_schema_overlay,
     apply_yaml_deep_merge,
     bucketize,
+    canonicalize_schema_yml,
     ensure_unique_names,
     fetch_defs,
     force_to_set,
@@ -649,6 +650,24 @@ def test_get_slot_usage_entry(
         assert get_slot_usage_entry(base, target) == expected_return
 
 
+class TestCanonicalizeSchemaYml:
+    def test_wrong_type_raises_invalid_schema_error(self, mocker):
+        # yaml_loader coerces scalar wrong-type values (e.g. integer -> string)
+        # during the round-trip, so they never reach the meta-schema validator.
+        # We mock yaml_dumper.dumps to inject a canonical YAML with an integer
+        # value for the string field `title`, simulating the validator being
+        # given wrong-type data. The "Schema validation failed:" prefix in the
+        # error message confirms the error comes from the meta-schema validator
+        # step, not from the yaml_loader TypeError step.
+        from linkml_runtime.dumpers import yaml_dumper
+
+        wrong_canonical = "id: https://example.com/test\nname: test-name\ntitle: 123\n"
+        mocker.patch.object(yaml_dumper, "dumps", return_value=wrong_canonical)
+
+        with pytest.raises(InvalidLinkMLSchemaError, match="Schema validation failed:"):
+            canonicalize_schema_yml("id: https://example.com/test\nname: test-name\n")
+
+
 class TestApplySchemaOverlay:
     @pytest.mark.parametrize(
         "overlay_content, expected_overrides",
@@ -717,7 +736,7 @@ class TestApplySchemaOverlay:
     def test_unknown_field_raises_invalid_schema_error(self, tmp_path: Path):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("not_a_field: some_value\n")
-        with pytest.raises(InvalidLinkMLSchemaError):
+        with pytest.raises(InvalidLinkMLSchemaError, match="Unknown field in schema:"):
             apply_schema_overlay(
                 schema_yml=SAMPLE_SCHEMA_YML, overlay_file=overlay_file
             )
@@ -725,9 +744,7 @@ class TestApplySchemaOverlay:
     def test_output_follows_schema_definition_field_order(self, tmp_path: Path):
         # description comes after name in SchemaDefinition; supply them reversed
         schema_yml = (
-            "description: some desc\n"
-            "name: test-name\n"
-            "id: https://example.com/test\n"
+            "description: some desc\nname: test-name\nid: https://example.com/test\n"
         )
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("title: My Title\n")
@@ -882,7 +899,7 @@ class TestApplyYamlDeepMerge:
     def test_unknown_field_raises_invalid_schema_error(self, tmp_path: Path):
         merge_file = tmp_path / "merge.yaml"
         merge_file.write_text("not_a_field: some_value\n")
-        with pytest.raises(InvalidLinkMLSchemaError):
+        with pytest.raises(InvalidLinkMLSchemaError, match="Unknown field in schema:"):
             apply_yaml_deep_merge(schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file)
 
 

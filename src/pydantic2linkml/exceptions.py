@@ -114,5 +114,6 @@ class YAMLContentError(ValueError):
 
 class InvalidLinkMLSchemaError(ValueError):
     """
-    Raised when a YAML string contains field names unknown to LinkML
+    Raised when a YAML string does not conform to the LinkML meta schema
+    (e.g. unknown field names or wrong-type values)
     """
