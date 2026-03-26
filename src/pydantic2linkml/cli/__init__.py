@@ -8,7 +8,7 @@ from linkml_runtime.dumpers import yaml_dumper
 from pydantic import ValidationError
 
 from pydantic2linkml.cli.tools import LogLevel
-from pydantic2linkml.exceptions import YAMLContentError
+from pydantic2linkml.exceptions import InvalidLinkMLSchemaError, YAMLContentError
 from pydantic2linkml.gen_linkml import translate_defs
 from pydantic2linkml.tools import (
     add_section_breaks,
@@ -31,9 +31,7 @@ def main(
             "-M",
             help="A YAML file whose contents are deep-merged into the generated "
             "schema. Values from this file win on conflict. The result is "
-            "always a valid YAML file but may not be a valid LinkML schema — "
-            "it is the user's responsibility to supply a merge file that "
-            "produces a valid schema.",
+            "validated against the LinkML meta schema.",
         ),
     ] = None,
     overlay_file: Annotated[
@@ -43,10 +41,7 @@ def main(
             "-O",
             help="An overlay file specifying a partial schema to be applied on top of "
             "the generated schema. The overlay is merged into the serialized YAML "
-            "output, so the result is always a valid YAML file but may not be a "
-            "valid LinkML schema — it is the user's responsibility to supply an "
-            "overlay that produces a valid schema. Overlay keys that do not "
-            "correspond to a field of SchemaDefinition are skipped.",
+            "output. The result is validated against the LinkML meta schema.",
         ),
     ] = None,
     output_file: Annotated[Optional[Path], typer.Option("--output-file", "-o")] = None,
@@ -59,7 +54,7 @@ def main(
 
     schema = translate_defs(module_names)
     logger.info("Dumping schema")
-    yml = remove_schema_key_duplication(yaml_dumper.dumps(schema))
+    yml = yaml_dumper.dumps(schema)
     if merge_file is not None:
         logger.info("Applying deep merge from %s", merge_file)
         try:
@@ -79,6 +74,11 @@ def main(
                 f"The merge file does not contain a valid YAML mapping: {e}",
                 param_hint="'--merge-file'",
             ) from e
+        except InvalidLinkMLSchemaError as e:
+            raise typer.BadParameter(
+                f"The merge file produces an invalid schema: {e}",
+                param_hint="'--merge-file'",
+            ) from e
     if overlay_file is not None:
         logger.info("Applying overlay from %s", overlay_file)
         try:
@@ -93,6 +93,12 @@ def main(
                 f"The overlay file does not contain a valid YAML mapping: {e}",
                 param_hint="'--overlay-file'",
             ) from e
+        except InvalidLinkMLSchemaError as e:
+            raise typer.BadParameter(
+                f"The overlay file produces an invalid schema: {e}",
+                param_hint="'--overlay-file'",
+            ) from e
+    yml = remove_schema_key_duplication(yml)
     yml = add_section_breaks(yml)
     if not output_file:
         print(yml, end="")  # noqa: T201

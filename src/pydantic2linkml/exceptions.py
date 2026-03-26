@@ -110,3 +110,10 @@ class YAMLContentError(ValueError):
     """
     Raise when the content of a YAML file is not what is expected
     """
+
+
+class InvalidLinkMLSchemaError(ValueError):
+    """
+    Raised when a YAML string does not conform to the LinkML meta schema
+    (e.g. unknown field names or wrong-type values)
+    """

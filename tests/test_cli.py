@@ -56,12 +56,12 @@ class TestCliOverlay:
         assert result.exit_code == 2
         assert "does not contain a" in result.output.lower()
 
-    def test_unknown_key(self, tmp_path: Path):
+    def test_unknown_field_raises_bad_parameter(self, tmp_path: Path):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("not_a_field: some_value\n")
         result = runner.invoke(app, ["dandischema.models", "-O", str(overlay_file)])
-        assert result.exit_code == 0
-        assert "not_a_field" not in result.output
+        assert result.exit_code == 2
+        assert "not_a_field" in result.output
 
 
 class TestCliDeepMerge:
@@ -106,3 +106,10 @@ class TestCliDeepMerge:
         result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
         assert result.exit_code == 2
         assert "does not contain valid YAML" in result.output
+
+    def test_unknown_field_raises_bad_parameter(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("not_a_field: some_value\n")
+        result = runner.invoke(app, ["dandischema.models", "-M", str(merge_file)])
+        assert result.exit_code == 2
+        assert "not_a_field" in result.output
