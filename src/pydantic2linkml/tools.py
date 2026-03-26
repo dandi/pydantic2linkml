@@ -611,13 +611,18 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     :param overlay_file: Path to an existing overlay YAML file
     :return: Canonical YAML string with the overlay applied, keys in
         SchemaDefinition order
-    :raises ValueError: If ``schema_yml`` does not deserialize to a dict
+    :raises ValueError: If ``schema_yml`` does not contain valid YAML or
+        does not deserialize to a dict
     :raises YAMLContentError: If the overlay file does not contain a YAML
         mapping
     :raises InvalidLinkMLSchemaError: If the result does not conform to
         the LinkML meta schema
     """
-    schema_dict = yaml.safe_load(schema_yml)
+    try:
+        schema_dict = yaml.safe_load(schema_yml)
+    except yaml.YAMLError as e:
+        raise ValueError(f"schema_yml does not contain valid YAML: {e}") from e
+
     if not isinstance(schema_dict, dict):
         raise ValueError(
             f"schema_yml did not deserialize to a dict: {type(schema_dict)}"

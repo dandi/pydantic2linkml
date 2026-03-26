@@ -733,6 +733,14 @@ class TestApplySchemaOverlay:
                 schema_yml="- item1\n- item2\n", overlay_file=overlay_file
             )
 
+    def test_schema_yml_invalid_yaml_raises_value_error(self, tmp_path: Path):
+        overlay_file = tmp_path / "overlay.yaml"
+        overlay_file.write_text("name: new-name\n")
+        with pytest.raises(ValueError):
+            apply_schema_overlay(
+                schema_yml="key: [unclosed\n", overlay_file=overlay_file
+            )
+
     def test_unknown_field_raises_invalid_schema_error(self, tmp_path: Path):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("not_a_field: some_value\n")
