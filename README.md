@@ -16,6 +16,6 @@ pydantic2linkml -o o.yml -l INFO dandischema.models
 | Flag | Description |
 |------|-------------|
 | `-o` / `--output-file` | Write output to a file (default: stdout) |
-| `-M` / `--merge-file` | Deep-merge a YAML file into the generated schema. Values from the file win on conflict; no field filtering is applied. |
-| `-O` / `--overlay-file` | Shallow-merge a YAML file into the generated schema. Only `SchemaDefinition` fields are applied; unknown keys are skipped with a warning. |
+| `-M` / `--merge-file` | Deep-merge a YAML file into the generated schema. Values from the file win on conflict; unknown field names raise an error. |
+| `-O` / `--overlay-file` | Shallow-merge a YAML file into the generated schema. Unknown field names raise an error. |
 | `-l` / `--log-level` | Log level (default: `WARNING`) |

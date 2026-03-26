@@ -1,4 +1,3 @@
-import logging
 import re
 from enum import Enum, auto
 from operator import itemgetter
@@ -12,9 +11,10 @@ from pydantic import BaseModel, RootModel, ValidationError
 from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
+    InvalidLinkMLSchemaError,
     NameCollisionError,
-    YAMLContentError,
     SlotExtensionError,
+    YAMLContentError,
 )
 from pydantic2linkml.tools import (
     add_section_breaks,
@@ -37,14 +37,18 @@ from pydantic2linkml.tools import (
 )
 
 # A minimal YAML dict suitable as schema_yml input for apply_schema_overlay
-# and apply_yaml_deep_merge tests
+# and apply_yaml_deep_merge tests.  Written in the canonical form produced by
+# yaml_dumper.dumps so that round-tripping through SchemaDefinition leaves the
+# content unchanged (aside from key reordering, which dict equality ignores).
 SAMPLE_SCHEMA_YML = (
     "id: https://example.com/test\n"
     "name: original-name\n"
+    "default_prefix: https://example.com/test/\n"
     "imports:\n"
     "  - linkml:types\n"
     "classes:\n"
     "  Foo:\n"
+    "    name: Foo\n"
     "    description: original description\n"
 )
 
@@ -710,19 +714,21 @@ class TestApplySchemaOverlay:
                 schema_yml="- item1\n- item2\n", overlay_file=overlay_file
             )
 
-    def test_unknown_key_logged_and_skipped(self, tmp_path: Path, caplog):
+    def test_unknown_field_raises_invalid_schema_error(self, tmp_path: Path):
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("not_a_field: some_value\n")
-        with caplog.at_level(logging.WARNING, logger="pydantic2linkml.tools"):
-            result = apply_schema_overlay(
+        with pytest.raises(InvalidLinkMLSchemaError):
+            apply_schema_overlay(
                 schema_yml=SAMPLE_SCHEMA_YML, overlay_file=overlay_file
             )
-        assert "not_a_field" in caplog.text
-        assert "not_a_field" not in yaml.safe_load(result)
 
     def test_output_follows_schema_definition_field_order(self, tmp_path: Path):
         # description comes after name in SchemaDefinition; supply them reversed
-        schema_yml = "description: some desc\nname: test-name\n"
+        schema_yml = (
+            "description: some desc\n"
+            "name: test-name\n"
+            "id: https://example.com/test\n"
+        )
         overlay_file = tmp_path / "overlay.yaml"
         overlay_file.write_text("title: My Title\n")
         result = apply_schema_overlay(schema_yml=schema_yml, overlay_file=overlay_file)
@@ -747,8 +753,11 @@ class TestApplyYamlDeepMerge:
                 {
                     "id": "https://example.com/test",
                     "name": "new-name",
+                    "default_prefix": "https://example.com/test/",
                     "imports": ["linkml:types"],
-                    "classes": {"Foo": {"description": "original description"}},
+                    "classes": {
+                        "Foo": {"name": "Foo", "description": "original description"}
+                    },
                 },
                 id="top_level_scalar_override",
             ),
@@ -763,13 +772,15 @@ class TestApplyYamlDeepMerge:
                 {
                     "id": "https://example.com/test",
                     "name": "original-name",
+                    "default_prefix": "https://example.com/test/",
                     "imports": ["linkml:types"],
                     "classes": {
                         "Foo": {
+                            "name": "Foo",
                             "description": "original description",
                             "title": "new title",
                         },
-                        "Bar": {"description": "bar desc"},
+                        "Bar": {"name": "Bar", "description": "bar desc"},
                     },
                 },
                 id="nested_dict_merge",
@@ -780,8 +791,11 @@ class TestApplyYamlDeepMerge:
                 {
                     "id": "https://example.com/test",
                     "name": "original-name",
+                    "default_prefix": "https://example.com/test/",
                     "imports": ["linkml:types"],
-                    "classes": {"Foo": {"description": "new description"}},
+                    "classes": {
+                        "Foo": {"name": "Foo", "description": "new description"}
+                    },
                 },
                 id="nested_dict_override",
             ),
@@ -791,8 +805,11 @@ class TestApplyYamlDeepMerge:
                 {
                     "id": "https://example.com/test",
                     "name": "original-name",
+                    "default_prefix": "https://example.com/test/",
                     "imports": ["linkml:types", "linkml:extra"],
-                    "classes": {"Foo": {"description": "original description"}},
+                    "classes": {
+                        "Foo": {"name": "Foo", "description": "original description"}
+                    },
                 },
                 id="append_to_list",
             ),
@@ -862,6 +879,12 @@ class TestApplyYamlDeepMerge:
         )
         assert yaml.safe_load(result)["title"] == "\u00dc n\u00ef c\u00f6d\u00e9"
 
+    def test_unknown_field_raises_invalid_schema_error(self, tmp_path: Path):
+        merge_file = tmp_path / "merge.yaml"
+        merge_file.write_text("not_a_field: some_value\n")
+        with pytest.raises(InvalidLinkMLSchemaError):
+            apply_yaml_deep_merge(schema_yml=SAMPLE_SCHEMA_YML, merge_file=merge_file)
+
 
 class TestRemoveSchemaKeyDuplication:
     def test_classes_name_removed(self):
@@ -910,6 +933,24 @@ class TestRemoveSchemaKeyDuplication:
         assert "text" not in pv
         assert pv["description"] == "Currently active"
 
+    def test_prefixes_prefix_prefix_removed(self):
+        schema = {
+            "prefixes": {
+                "linkml": {
+                    "prefix_prefix": "linkml",
+                    "prefix_reference": "https://w3id.org/linkml/",
+                },
+                "ex": {
+                    "prefix_prefix": "ex",
+                    "prefix_reference": "https://example.org/",
+                },
+            }
+        }
+        result = yaml.safe_load(remove_schema_key_duplication(yaml.dump(schema)))
+        for prefix_entry in result["prefixes"].values():
+            assert "prefix_prefix" not in prefix_entry
+            assert "prefix_reference" in prefix_entry
+
     def test_missing_sections_no_error(self):
         schema = {"id": "https://example.com/test", "name": "test-schema"}
         result = yaml.safe_load(remove_schema_key_duplication(yaml.dump(schema)))
@@ -926,6 +967,8 @@ class TestRemoveSchemaKeyDuplication:
         result_yml = remove_schema_key_duplication(raw_yml)
         result = yaml.safe_load(result_yml)
 
+        for prefix_entry in result.get("prefixes", {}).values():
+            assert "prefix_prefix" not in prefix_entry
         for cls in result.get("classes", {}).values():
             assert "name" not in cls
             for su in cls.get("slot_usage", {}).values():

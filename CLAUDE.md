@@ -69,10 +69,10 @@ Options:
 
 - `--output-file`/`-o` (path) — write output to a file instead of stdout
 - `--merge-file`/`-M` (path) — deep-merge a YAML file into the generated
-  schema; values from the file win on conflict; no field filtering applied
+  schema; values from the file win on conflict; unknown field names raise
+  an error
 - `--overlay-file`/`-O` (path) — shallow-merge a YAML file into the
-  generated schema; only `SchemaDefinition` fields are applied; unknown
-  keys are skipped with a warning
+  generated schema; unknown field names raise an error
 - `--log-level`/`-l` (default: WARNING)
 
 ## Architecture
@@ -91,13 +91,18 @@ Options:
      resolution context, field name, `FieldInfo`, and owning model
    - `resolve_ref_schema()` — resolves `definition-ref` and `definitions`
      schema types to concrete schemas
+   - `canonicalize_schema_yml(yml)` — round-trips a YAML string through
+     `SchemaDefinition` to produce canonically ordered output and detect
+     unknown field names (raises `InvalidLinkMLSchemaError`); note that
+     wrong-type values for known fields are generally not detected
    - `apply_schema_overlay(schema_yml, overlay_file)` — shallow-merges a
-     YAML file into a schema YAML string; restricts keys to
-     `SchemaDefinition` fields
+     YAML file into a schema YAML string; no field filtering; calls
+     `canonicalize_schema_yml` to reorder keys and detect unknown fields
    - `apply_yaml_deep_merge(schema_yml, merge_file)` — deep-merges a YAML
-     file into a schema YAML string using `deepmerge`; no field filtering
-   - `remove_schema_key_duplication(yml)` — strips redundant `name`/`text`
-     fields from serialized LinkML YAML
+     file into a schema YAML string using `deepmerge`; calls
+     `canonicalize_schema_yml` to reorder keys and detect unknown fields
+   - `remove_schema_key_duplication(yml)` — strips redundant `name`/`text`/
+     `prefix_prefix` fields from serialized LinkML YAML
    - `add_section_breaks(yml)` — inserts blank lines before top-level
      sections
 
@@ -109,8 +114,8 @@ Options:
 
 3. **`cli/`** — Typer-based CLI wrapping `translate_defs`; `cli/__init__.py`
    defines the `app` and `main` command. After translation the pipeline is:
-   dump YAML → `remove_schema_key_duplication` → optional `-M` deep merge
-   → optional `-O` overlay → `add_section_breaks` → output.
+   dump YAML → optional `-M` deep merge → optional `-O` overlay →
+   `remove_schema_key_duplication` → `add_section_breaks` → output.
 
 4. **`exceptions.py`** — Custom exceptions:
    - `NameCollisionError` — duplicate class/enum names across modules
@@ -120,6 +125,8 @@ Options:
      via slot_usage
    - `YAMLContentError` — YAML file content is not what is expected (e.g.,
      not a mapping)
+   - `InvalidLinkMLSchemaError` — YAML string contains field names unknown
+     to LinkML (raised by `canonicalize_schema_yml`)
 
 ### Key Design Patterns
 

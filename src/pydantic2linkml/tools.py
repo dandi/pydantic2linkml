@@ -12,7 +12,9 @@ from types import ModuleType
 from typing import Any, NamedTuple, Optional, TypeVar, cast
 
 import yaml
+from linkml_runtime.dumpers import yaml_dumper
 from linkml_runtime.linkml_model import SchemaDefinition, SlotDefinition
+from linkml_runtime.loaders import yaml_loader
 from linkml_runtime.utils.formatutils import is_empty
 from pydantic import BaseModel, FilePath, RootModel, validate_call
 
@@ -22,9 +24,10 @@ from pydantic.fields import FieldInfo
 from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
+    InvalidLinkMLSchemaError,
     NameCollisionError,
-    YAMLContentError,
     SlotExtensionError,
+    YAMLContentError,
 )
 
 logger = logging.getLogger(__name__)
@@ -201,9 +204,9 @@ def get_model_schema(model: type[BaseModel]) -> core_schema.ModelSchema:
         else:
             model_schema = inner_schema
 
-    assert model_schema["type"] == "model", (
-        "Assumption about how model schema is stored is wrong."
-    )
+    assert (
+        model_schema["type"] == "model"
+    ), "Assumption about how model schema is stored is wrong."
 
     return cast(core_schema.ModelSchema, model_schema)
 
@@ -534,17 +537,56 @@ def get_slot_usage_entry(
     )
 
 
+def canonicalize_schema_yml(yml: str) -> str:
+    """Canonicalize a YAML string as a LinkML schema via a round-trip.
+
+    Deserializes ``yml`` into a ``SchemaDefinition`` object and
+    re-serializes it.  The round-trip serves two purposes:
+
+    * **Unknown-field detection** — ``yaml_loader`` raises ``TypeError``
+      for any field name unknown to ``SchemaDefinition`` or its nested
+      objects; this function catches that and re-raises it as
+      ``InvalidLinkMLSchemaError``.  Note: wrong-type values for known
+      fields are generally not detected.
+    * **Canonical ordering** — the output keys follow the same order
+      produced by serializing a freshly constructed ``SchemaDefinition``.
+
+    :param yml: A YAML string to canonicalize as a LinkML schema.
+    :return: Canonically ordered YAML string representing the schema.
+    :raises InvalidLinkMLSchemaError: If ``yml`` contains field names
+        unknown to ``SchemaDefinition`` or any of its nested objects.
+    """
+    try:
+        sd = yaml_loader.loads(yml, target_class=SchemaDefinition)
+    except TypeError as e:
+        raise InvalidLinkMLSchemaError(str(e)) from e
+
+    return yaml_dumper.dumps(sd)
+
+
 @validate_call
 def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
     """Apply an overlay YAML file onto a serialized schema YAML string.
 
-    :param schema_yml: YAML string of a serialized SchemaDefinition
+    All keys from the overlay are applied without filtering.  The result
+    is then round-tripped through ``SchemaDefinition`` via
+    ``canonicalize_schema_yml``, which reorders keys canonically and
+    raises ``InvalidLinkMLSchemaError`` for any field names unknown to
+    ``SchemaDefinition`` or its nested objects.
+
+    Note: The result is always a valid YAML file but may not be a valid
+    LinkML schema — it is the user's responsibility to supply an overlay
+    that produces a valid schema.
+
+    :param schema_yml: YAML string of a valid LinkML schema
     :param overlay_file: Path to an existing overlay YAML file
-    :return: YAML string with the overlay applied, keys ordered to match
-        SchemaDefinition field order
+    :return: Canonical YAML string with the overlay applied, keys in
+        SchemaDefinition order
     :raises ValueError: If ``schema_yml`` does not deserialize to a dict
     :raises YAMLContentError: If the overlay file does not contain a YAML
         mapping
+    :raises InvalidLinkMLSchemaError: If the overlay introduces field
+        names unknown to ``SchemaDefinition`` or its nested objects
     """
     schema_dict = yaml.safe_load(schema_yml)
     if not isinstance(schema_dict, dict):
@@ -560,24 +602,10 @@ def apply_schema_overlay(schema_yml: str, overlay_file: FilePath) -> str:
             f"Overlay file {overlay_file} must contain a YAML mapping"
         )
 
-    # Ordered list of valid SchemaDefinition field names
-    sd_field_names = [f.name for f in fields(SchemaDefinition)]
-    sd_field_set = set(sd_field_names)
-
-    # Apply overlay, skipping keys that are not SchemaDefinition fields
-    for k, v in overlay.items():
-        if k not in sd_field_set:
-            logger.warning(
-                "Overlay key '%s' is not a field of SchemaDefinition. Skipping.",
-                k,
-            )
-        else:
-            schema_dict[k] = v
-
-    # Rebuild dict in SchemaDefinition field order
-    ordered = {k: schema_dict[k] for k in sd_field_names if k in schema_dict}
-
-    return yaml.dump(ordered, allow_unicode=True, sort_keys=False)
+    schema_dict.update(overlay)
+    return canonicalize_schema_yml(
+        yaml.dump(schema_dict, allow_unicode=True, sort_keys=False)
+    )
 
 
 @validate_call
@@ -585,15 +613,24 @@ def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
     """Deep-merge a YAML file into a serialized schema YAML string.
 
     Values from the merge file win on conflict. The merge is unrestricted —
-    no field filtering is applied.
+    no field filtering is applied.  The result is then round-tripped
+    through ``SchemaDefinition`` via ``canonicalize_schema_yml``, which
+    reorders keys canonically and raises ``InvalidLinkMLSchemaError`` for
+    any field names unknown to ``SchemaDefinition`` or its nested objects.
+
+    Note: The result is always a valid YAML file but may not be a valid
+    LinkML schema — it is the user's responsibility to supply a merge file
+    that produces a valid schema.
 
     :param schema_yml: YAML string of a valid LinkML schema
     :param merge_file: Path to an existing YAML file containing a mapping
-    :return: YAML string with the deep merge applied
+    :return: Canonical YAML string with the deep merge applied
     :raises ValueError: If ``schema_yml`` does not contain valid YAML or does
         not deserialize to a dict
     :raises yaml.YAMLError: If the merge file does not contain valid YAML
     :raises YAMLContentError: If the merge file does not contain a YAML mapping
+    :raises InvalidLinkMLSchemaError: If the merge introduces field names
+        unknown to ``SchemaDefinition`` or its nested objects
     """
     from deepmerge import always_merger
 
@@ -613,25 +650,31 @@ def apply_yaml_deep_merge(schema_yml: str, merge_file: FilePath) -> str:
     if not isinstance(merge_dict, dict):
         raise YAMLContentError(f"Merge file {merge_file} must contain a YAML mapping")
 
-    return yaml.dump(
-        always_merger.merge(schema_dict, merge_dict),
-        allow_unicode=True,
-        sort_keys=False,
+    return canonicalize_schema_yml(
+        yaml.dump(
+            always_merger.merge(schema_dict, merge_dict),
+            allow_unicode=True,
+            sort_keys=False,
+        )
     )
 
 
 def remove_schema_key_duplication(yml: str) -> str:
-    """Remove redundant name/text fields from a valid serialized LinkML schema.
+    """Remove redundant name/text/prefix_prefix fields from a serialized
+    LinkML schema.
 
     In LinkML's serialized YAML, dictionary keys already serve as
-    identifiers for classes, slots, enums, slot_usage entries, and
-    permissible values. This function strips the redundant ``name`` and
-    ``text`` fields that the linkml-runtime YAML dumper includes alongside
-    those keys.
+    identifiers for classes, slots, enums, slot_usage entries,
+    permissible values, and prefixes.  This function strips the redundant
+    ``name``, ``text``, and ``prefix_prefix`` fields that the
+    linkml-runtime YAML dumper includes alongside those keys.
 
     :param yml: A YAML string representing a **valid** LinkML schema.
     """
     schema = yaml.safe_load(yml)
+
+    for prefix in schema.get("prefixes", {}).values():
+        prefix.pop("prefix_prefix", None)
 
     for cls in schema.get("classes", {}).values():
         cls.pop("name", None)
