@@ -866,11 +866,17 @@ class SlotGenerator:
                 "LinkML lacks direct support for this restriction."
             )
         if "microseconds_precision" in schema:
-            self._attach_note(
-                f"Unable to express the microseconds precision constraint of "
-                f"{schema['microseconds_precision']}. "
-                "LinkML lacks direct support for this restriction."
-            )
+            # "truncate" is the default value for `microseconds_precision` and
+            # exhibits the default behavior of a Pydantic field annotated with
+            # type `datetime.datetime`, so we don't add a note for the user
+            # for it. Other values are likely introduced intentionally, so we
+            # add a note for them.
+            if schema["microseconds_precision"] != "truncate":
+                self._attach_note(
+                    f"Unable to express the microseconds precision constraint of "
+                    f"{schema['microseconds_precision']}. "
+                    "LinkML lacks direct support for this restriction."
+                )
 
     def _timedelta_schema(self, schema: core_schema.TimedeltaSchema) -> None:
         raise TranslationNotImplementedError(schema)
