@@ -516,7 +516,7 @@ class TestSlotGenerator:
     @pytest.mark.parametrize("now_op", ["future", None])
     @pytest.mark.parametrize("tz_constraint", ["native", 42, None])
     @pytest.mark.parametrize("now_utc_offset", [10, -20, None])
-    @pytest.mark.parametrize("microseconds_precision", ["truncate", None])
+    @pytest.mark.parametrize("microseconds_precision", ["truncate", "error", None])
     def test_datetime_schema(
         self,
         le,
@@ -579,11 +579,12 @@ class TestSlotGenerator:
             "in the restriction",
             now_utc_offset is not None,
         )
-        verify_notes(
-            f"Unable to express the microseconds precision constraint of "
-            f"{microseconds_precision}",
-            microseconds_precision is not None,
-        )
+        if microseconds_precision != "truncate":
+            verify_notes(
+                f"Unable to express the microseconds precision constraint of "
+                f"{microseconds_precision}",
+                microseconds_precision is not None,
+            )
 
     @pytest.mark.parametrize(
         ("literal_specs", "are_literals_supported", "any_of_slot_value"),
