@@ -182,13 +182,16 @@ class LinkmlGenerator:
         """
         Add the slots construed from the fields in `self._m_f_map` to the schema
         """
-        # Extract all the newly defined fields from across all models
-        new_fields: Iterable[tuple[str, FieldSchema]] = chain.from_iterable(
-            v.new.items() for v in self._m_f_map.values()
+        # Extract all locally defined fields (both newly defined and overriding)
+        # from across all models. Overriding fields must be included so that the
+        # top-level slot only keeps properties that are consistent across every
+        # occurrence of the field name, including overrides in subclasses.
+        all_fields: Iterable[tuple[str, FieldSchema]] = chain.from_iterable(
+            chain(v.new.items(), v.overriding.items()) for v in self._m_f_map.values()
         )
 
         buckets: defaultdict[str, list[FieldSchema]] = bucketize(
-            new_fields, key_func=itemgetter(0), value_func=itemgetter(1)
+            all_fields, key_func=itemgetter(0), value_func=itemgetter(1)
         )
 
         # Sort the buckets by field name case-insensitively
