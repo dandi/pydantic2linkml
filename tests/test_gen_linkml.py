@@ -184,6 +184,27 @@ class TestLinkmlGenerator:
         class_b = schema.classes["B"]
         assert class_b.description is None
 
+    def test_overriding_fields_considered_in_top_level_slot(self):
+        """
+        Regression test: when a subclass overrides a field with a different
+        type, the top-level slot must not keep the range of the base class's
+        field. The overriding field occurrences should also participate in the
+        consistency check performed by `_add_slot`.
+        """
+
+        class Base(BaseModel):
+            x: int
+
+        class Sub(Base):
+            x: str  # type: ignore[assignment]
+
+        generator = LinkmlGenerator(models=[Base, Sub], enums=[])
+        schema = generator.generate()
+
+        # The top-level slot should not claim a consistent range because
+        # Base.x is int and Sub.x is str.
+        assert schema.slots["x"].range is None
+
 
 class TestSlotGenerator:
     def test_instantiation(self):
