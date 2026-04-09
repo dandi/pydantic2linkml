@@ -147,3 +147,9 @@ Options:
 
 - Group related tests into a class.
 - Use parametrization to reduce code duplication.
+
+## Workflow Preferences
+
+- Hatch environments use **uv** as the installer. Use
+  `hatch run uv pip ...` instead of `hatch run pip ...` when querying
+  or managing packages (e.g., `hatch run uv pip show <pkg>`).
