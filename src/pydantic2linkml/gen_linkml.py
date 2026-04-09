@@ -457,6 +457,13 @@ class SlotGenerator:
         # Pydantic fields are required unless a default value is provided
         self._slot.required = True
 
+        # Set title and description from the Pydantic field metadata
+        field_info = self._field_schema.field_info
+        if field_info.title is not None:
+            self._slot.title = field_info.title
+        if field_info.description is not None:
+            self._slot.description = field_info.description
+
         # Shape the contained slot according to core schema of the corresponding field
         self._shape_slot(self._field_schema.schema)
 

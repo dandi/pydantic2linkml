@@ -1121,3 +1121,27 @@ class TestSlotGenerator:
 
         assert slot.range == "string"
         assert slot.pattern == expected_pattern
+
+    @pytest.mark.parametrize(
+        ("title", "description"),
+        [
+            ("My Title", "My description"),
+            ("My Title", None),
+            (None, "My description"),
+            (None, None),
+        ],
+    )
+    def test_title_and_description(self, title, description):
+        field_kwargs = {}
+        if title is not None:
+            field_kwargs["title"] = title
+        if description is not None:
+            field_kwargs["description"] = description
+
+        class Foo(BaseModel):
+            x: str = Field(**field_kwargs)
+
+        slot = translate_field_to_slot(Foo, "x")
+
+        assert slot.title == title
+        assert slot.description == description
