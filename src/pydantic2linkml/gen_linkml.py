@@ -72,12 +72,6 @@ ANY_CLASS_DEF = ClassDefinition(
     name="Any", description="Any object", class_uri="linkml:Any"
 )
 
-# Fields of `SlotDefinition` excluded when projecting onto an
-# `AnonymousSlotExpression`. `required` is a slot-level property (whether the
-# slot must be present in an instance) and does not belong in a constraint
-# expression context.
-_ASE_EXCLUDED_SD_FIELDS = frozenset(["required"])
-
 
 class LinkmlGenerator:
     """
@@ -453,16 +447,20 @@ class SlotGenerator:
         if self._used:
             raise GeneratorReuseError(self)
 
-        # Initialized the `required` meta slot to `True` since all
-        # Pydantic fields are required unless a default value is provided
-        self._slot.required = True
+        # Field-level properties (`required`, `title`, `description`) are only
+        # appropriate when translating the schema of the field itself, not a
+        # sub-schema in the schema of the field (e.g., a choice in a union type).
+        if not self._field_schema.is_subschema:
+            # Initialized the `required` meta slot to `True` since all
+            # Pydantic fields are required unless a default value is provided
+            self._slot.required = True
 
-        # Set title and description from the Pydantic field metadata
-        field_info = self._field_schema.field_info
-        if field_info.title is not None:
-            self._slot.title = field_info.title
-        if field_info.description is not None:
-            self._slot.description = field_info.description
+            # Set title and description from the Pydantic field metadata
+            field_info = self._field_schema.field_info
+            if field_info.title is not None:
+                self._slot.title = field_info.title
+            if field_info.description is not None:
+                self._slot.description = field_info.description
 
         # Shape the contained slot according to core schema of the corresponding field
         self._shape_slot(self._field_schema.schema)
@@ -505,13 +503,13 @@ class SlotGenerator:
             annotation of the associated Pydantic model field
         :return: An `AnonymousSlotExpression` representing the given subschema
         """
-        sub_field_schema = self._field_schema._replace(schema=subschema)
+        sub_field_schema = self._field_schema._replace(
+            schema=subschema, is_subschema=True
+        )
         sd = SlotGenerator(sub_field_schema).generate()
 
         ase_kwargs = {
-            f.name: getattr(sd, f.name)
-            for f in fields(AnonymousSlotExpression)
-            if f.name not in _ASE_EXCLUDED_SD_FIELDS
+            f.name: getattr(sd, f.name) for f in fields(AnonymousSlotExpression)
         }
         return AnonymousSlotExpression(**ase_kwargs)
 
