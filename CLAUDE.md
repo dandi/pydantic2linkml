@@ -89,7 +89,10 @@ Options:
      resolved `pydantic_core.CoreSchema` objects for fields, distinguishing
      newly defined vs. overriding fields
    - `FieldSchema` (NamedTuple) — bundles a field's core schema, its
-     resolution context, field name, `FieldInfo`, and owning model
+     resolution context, field name, `FieldInfo`, owning model, and an
+     `is_subschema` flag (default `False`) indicating whether this
+     represents a sub-schema in the schema of a field (e.g., a union
+     choice) rather than the schema of the field itself
    - `resolve_ref_schema()` — resolves `definition-ref` and `definitions`
      schema types to concrete schemas
    - `canonicalize_schema_yml(yml)` — round-trips a YAML string through

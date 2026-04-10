@@ -57,6 +57,11 @@ class FieldSchema(NamedTuple):
     # The Pydantic model in which the field is defined
     model: type[BaseModel]
 
+    # Whether this represents a sub-schema in the schema of a field
+    # (e.g., a choice in a union type) rather than the schema of the
+    # field itself
+    is_subschema: bool = False
+
 
 class LocallyDefinedFields(NamedTuple):
     new: dict[str, FieldSchema]

@@ -1145,3 +1145,14 @@ class TestSlotGenerator:
 
         assert slot.title == title
         assert slot.description == description
+
+    def test_subschema_excludes_field_level_properties(self):
+        class Foo(BaseModel):
+            x: str = Field(title="T", description="D")
+
+        field_schema = get_field_schema(Foo, "x")._replace(is_subschema=True)
+        slot = SlotGenerator(field_schema).generate()
+
+        assert slot.required is None
+        assert slot.title is None
+        assert slot.description is None
