@@ -16,6 +16,7 @@ from typing import Any, NamedTuple, Optional, TypeVar, cast
 import yaml
 from linkml_runtime.dumpers import yaml_dumper
 from linkml_runtime.linkml_model import SchemaDefinition, SlotDefinition
+from linkml_runtime.linkml_model.meta import SlotExpression
 from linkml_runtime.loaders import yaml_loader
 from linkml_runtime.utils.formatutils import is_empty
 from pydantic import BaseModel, FilePath, RootModel, validate_call
@@ -33,6 +34,12 @@ from pydantic2linkml.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# The set of field names defined in SlotExpression. These represent constraint
+# properties that cannot be overridden in a slot_usage entry.
+SLOT_EXPRESSION_FIELD_NAMES: frozenset[str] = frozenset(
+    f.name for f in fields(SlotExpression)
+)
 
 
 class StrEnum(str, Enum):
@@ -500,22 +507,39 @@ def get_slot_usage_entry(
     base: SlotDefinition, target: SlotDefinition
 ) -> Optional[SlotDefinition]:
     """
-    Obtain a slot usage entry that extends (refines) the base slot definition,
-    in a class definition, to achieve the behavior of the target slot definition
+    Obtain a slot usage entry that extends or overrides aspects of the base
+    slot definition, in a class definition, to achieve the behavior of the
+    target slot definition
+
+    In LinkML, ``slot_usage`` entries can extend the base slot with new
+    properties and override non-constraint properties (e.g., ``title``,
+    ``description``), but cannot override constraint properties (those
+    defined in ``SlotExpression``, such as ``range``, ``required``,
+    ``multivalued``, etc.).
 
     :param base: The base slot definition
-    :param target: The target slot definition
+    :param target: The target slot definition. Must have the same ``name`` as
+        *base*.
 
-    :return: The slot usage entry that extends the base slot definition to achieve the
-        behavior of the target slot definition. If the base slot definition doesn't
-        need an extension to achieve the behavior of the target slot definition, i.e.,
-        the base slot definition and the target slot definition are identical, `None` is
-        returned.
+    :return: The slot usage entry that extends or overrides aspects of the
+        base slot definition to achieve the behavior of the target slot
+        definition. If the base slot definition doesn't need any extension
+        or overriding to achieve the behavior of the target slot definition,
+        i.e., the base slot definition and the target slot definition are
+        identical from a slot_usage perspective, ``None`` is returned.
 
-    :raises SlotExtensionError: If the given base slot definition cannot be extended to
-        achieve the behavior of the given target slot definition through a slot usage
-        entry in a class definition
+    :raises ValueError: If ``base.name`` and ``target.name`` differ
+    :raises SlotExtensionError: If the given base slot definition cannot be
+        extended or overridden to achieve the behavior of the given target
+        slot definition through a slot usage entry in a class definition,
+        due to missing properties or differing constraint properties
     """
+    if base.name != target.name:
+        raise ValueError(
+            f"base and target must have the same name, "
+            f"got {base.name!r} and {target.name!r}"
+        )
+
     base_properties = get_non_empty_meta_slots(base)
     target_properties = get_non_empty_meta_slots(target)
 
@@ -527,20 +551,28 @@ def get_slot_usage_entry(
         if getattr(base, p) != getattr(target, p):
             varied_properties.add(p)
 
-    if missing_properties or varied_properties:
+    # Split varied properties into constraint (disqualifying) and
+    # non-constraint (overridable in slot_usage)
+    constraint_varied = varied_properties & SLOT_EXPRESSION_FIELD_NAMES
+    overridable_varied = varied_properties - SLOT_EXPRESSION_FIELD_NAMES
+
+    if missing_properties or constraint_varied:
         raise SlotExtensionError(
             missing_meta_slots=sorted(missing_properties, key=str.casefold),
-            varied_meta_slots=sorted(varied_properties, key=str.casefold),
+            varied_constraint_meta_slots=sorted(constraint_varied, key=str.casefold),
         )
 
     extended_properties = target_properties - base_properties
+    properties_for_slot_usage = extended_properties | overridable_varied
 
-    if not extended_properties:
+    if not properties_for_slot_usage:
         return None
 
-    # Note: A `name` argument is provided because the `SlotDefinition` class requires it
+    # Note: A `name` argument is provided because the `SlotDefinition`
+    # class requires it
     return SlotDefinition(
-        name=base.name, **{p: getattr(target, p) for p in extended_properties}
+        name=base.name,
+        **{p: getattr(target, p) for p in properties_for_slot_usage},
     )
 
 

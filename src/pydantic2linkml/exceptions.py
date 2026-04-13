@@ -62,47 +62,49 @@ class SlotExtensionError(Exception):
     def __init__(
         self,
         missing_meta_slots: Optional[list[str]] = None,
-        varied_meta_slots: Optional[list[str]] = None,
+        varied_constraint_meta_slots: Optional[list[str]] = None,
     ):
         """
         :param missing_meta_slots: The meta slots that exist in the base slot definition
             but not in the target slot definition. If None or not provided, an empty
             list is used.
-        :param varied_meta_slots: The meta slots that exist in both the base and target
-            slot definitions but have different values. If None or not provided, an
-            empty list is used.
-        :raises ValueError: If both `missing_meta_slots` and `varied_meta_slots` are
-            empty
+        :param varied_constraint_meta_slots: The constraint meta slots (i.e., those
+            defined in ``SlotExpression``) that exist in both the base and target slot
+            definitions but have different values. If None or not provided, an empty
+            list is used.
+        :raises ValueError: If both `missing_meta_slots` and
+            `varied_constraint_meta_slots` are empty
         """
         if missing_meta_slots is None:
             missing_meta_slots = []
-        if varied_meta_slots is None:
-            varied_meta_slots = []
+        if varied_constraint_meta_slots is None:
+            varied_constraint_meta_slots = []
 
-        if len(missing_meta_slots) + len(varied_meta_slots) == 0:
+        if len(missing_meta_slots) + len(varied_constraint_meta_slots) == 0:
             error_msg = (
-                "At least one of `missing_meta_slots` and `varied_meta_slots` "
-                "must be non-empty."
+                "At least one of `missing_meta_slots` and "
+                "`varied_constraint_meta_slots` must be non-empty."
             )
             raise ValueError(error_msg)
 
         super().__init__()
 
         self.missing_meta_slots: list[str] = missing_meta_slots
-        self.varied_meta_slots: list[str] = varied_meta_slots
+        self.varied_constraint_meta_slots: list[str] = varied_constraint_meta_slots
 
     def __str__(self):
         return (
             f"Target slot definition has missing meta slots, "
-            f"{self.missing_meta_slots}, and varied meta slots, "
-            f"{self.varied_meta_slots}"
+            f"{self.missing_meta_slots}, and varied constraint meta slots, "
+            f"{self.varied_constraint_meta_slots}"
         )
 
     def __repr__(self):
         return (
             f"{type(self).__name__}"
             f"(missing_meta_slots={self.missing_meta_slots!r}, "
-            f"varied_meta_slots={self.varied_meta_slots!r})"
+            f"varied_constraint_meta_slots="
+            f"{self.varied_constraint_meta_slots!r})"
         )
 
 
