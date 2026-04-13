@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "43075bd24965",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "src/pydantic2linkml/exceptions.py",
+    "src/pydantic2linkml/gen_linkml.py",
+    "src/pydantic2linkml/tools.py",
+    "tests/test_tools.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/43/075bd24965/0/metadata.json",
+      "transcript": "/43/075bd24965/0/full.jsonl",
+      "content_hash": "/43/075bd24965/0/content_hash.txt",
+      "prompt": "/43/075bd24965/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 202,
+    "cache_creation_tokens": 186780,
+    "cache_read_tokens": 5340401,
+    "output_tokens": 26915,
+    "api_call_count": 98
+  }
+}

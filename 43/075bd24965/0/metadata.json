@@ -1,0 +1,126 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "43075bd24965",
+  "session_id": "f6fa0000-0442-4c40-952f-69822dfb5495",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-13T19:50:52.155016Z",
+  "branch": "main",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "src/pydantic2linkml/exceptions.py",
+    "src/pydantic2linkml/gen_linkml.py",
+    "src/pydantic2linkml/tools.py",
+    "tests/test_tools.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6",
+  "turn_id": "660263097040",
+  "token_usage": {
+    "input_tokens": 202,
+    "cache_creation_tokens": 186780,
+    "cache_read_tokens": 5340401,
+    "output_tokens": 26915,
+    "api_call_count": 98
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-13T19:50:51.798807Z",
+    "agent_lines": 150,
+    "agent_removed": 86,
+    "human_added": 5,
+    "human_modified": 12,
+    "human_removed": 0,
+    "total_committed": 167,
+    "total_lines_changed": 253,
+    "agent_percentage": 93.2806324110672,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 153,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "data.yaml": 1,
+        "personinfo.json": 27,
+        "personinfo.py": 95,
+        "personinfo.yaml": 23,
+        "tmp.py": 7
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 274,
+      "agent_lines_removed": 46
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 15,
+      "user_lines_removed": 10,
+      "agent_lines_added": 275,
+      "agent_lines_removed": 53,
+      "user_added_per_file": {
+        "src/pydantic2linkml/exceptions.py": 12,
+        "src/pydantic2linkml/gen_linkml.py": 3
+      },
+      "user_removed_per_file": {
+        "src/pydantic2linkml/exceptions.py": 6,
+        "src/pydantic2linkml/gen_linkml.py": 4
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 277,
+      "agent_lines_removed": 50
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 277,
+      "agent_lines_removed": 50
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 277,
+      "agent_lines_removed": 50
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 281,
+      "agent_lines_removed": 52
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 335,
+      "agent_lines_removed": 98,
+      "user_added_per_file": {
+        "tests/test_tools.py": 2
+      },
+      "user_removed_per_file": {
+        "tests/test_tools.py": 2
+      }
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 332,
+      "agent_lines_removed": 98
+    }
+  ]
+}

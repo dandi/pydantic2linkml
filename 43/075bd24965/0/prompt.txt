@@ -1,0 +1,59 @@
+The `get_slot_usage_entry` function can be improved. Particularly,
+
+- Not all varied properties should be a disqualification to generate a `SlotDefinition` as a `usage_entry`. Upon a careful reading of https://linkml.io/linkml/schemas/slots.html#slot-usage with you in a previous conversation, we found out that only properties that are considered constraints can't be overriden. Other properties, such as `title` and `description`, can be overriden with a defintion of a `slot_usage` entry. Properties that are considered constraints are the ones defined in `SlotExpression`. (You can double check this.)
+- We should allows non-disqualifying varied properties to be part of the returned `SlotDefinition`.
+- We should also adjust corresponding note in generating a `slot_usage` entry when encounting a disqualifying varied property
+- We should also adjust the comment, including docstring
+- Update any other documentation when appropriate.
+
+---
+
+I have made some comment with TODOs in the plan document, please adjust.
+
+---
+
+I have made some comment with TODOs in the plan document, please adjust.
+
+---
+
+I am in plan mode now. Can you update my plan by incorportng the TODO comments I added?
+
+---
+
+I updated the plan with a TODO comment. Please incorporate that comment in the plan.
+
+---
+
+Let's proceed.
+
+---
+
+I don't see the point of `missing_meta_slots` and `varied_constraint_meta_slots` being optional types and defaulting to `None`.  I think they can be just the type of `list[str]` and have a default factory of `list`.
+
+---
+
+wait, isn't this a now a problem for the type checker since `()` is not a list?
+
+---
+
+I made a small change in `gen_linkml.py`. Would you take a look?
+
+---
+
+Pleae make sure you mention this change in the commit message and PR comment at the end.
+
+---
+
+please run all the steps in the verification section in the plan again.
+
+---
+
+Please adjust the comment of `get_slot_usage_entry` to describe that returned slot usage entry can not only potentially extend but also possibly override some aspects of the base slot definition.
+
+---
+
+Why don't you group all tests for `get_slot_usage_entry` into one class?
+
+---
+
+let's run all the ruff and type checks.
