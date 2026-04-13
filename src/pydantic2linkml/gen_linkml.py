@@ -303,10 +303,9 @@ class LinkmlGenerator:
             # Get the global slot representation of the field
             global_slot = self._sb.schema.slots[name]
 
-            if global_slot != new_field_slot_rep:
-                # Create a slot usage entry for the field
-                entry = get_slot_usage_entry(global_slot, new_field_slot_rep)
-                assert entry is not None
+            # Create a slot usage entry for the field
+            entry = get_slot_usage_entry(global_slot, new_field_slot_rep)
+            if entry is not None:
                 slot_usage.append(entry)
 
         # === Handle overriding fields in the model ===
@@ -343,8 +342,9 @@ class LinkmlGenerator:
                     else ""
                 )
                 varied_substr = (
-                    f"has changes in value in meta slots: {e.varied_meta_slots} "
-                    if e.varied_meta_slots
+                    f"has changes in value in constraint meta slots: "
+                    f"{e.varied_constraint_meta_slots} "
+                    if e.varied_constraint_meta_slots
                     else ""
                 )
                 substr = "and ".join(s for s in [missing_substr, varied_substr] if s)

@@ -583,71 +583,118 @@ def test_get_non_empty_meta_slots(slot, expected_non_empty_meta_slots):
     assert get_non_empty_meta_slots(slot) == expected_non_empty_meta_slots
 
 
-@pytest.mark.parametrize(
-    ("base", "target", "expected_missing", "expected_varied", "expected_return"),
-    [
-        # Base and target are the same
-        (SlotDefinition("a"), SlotDefinition("a"), [], [], None),
-        (
-            SlotDefinition("a", required=True, range="integer"),
-            SlotDefinition("a", required=True, range="integer"),
-            [],
-            [],
-            None,
-        ),
-        # Target is missing some required meta slots
-        (
-            SlotDefinition("a", required=True, range="integer"),
-            SlotDefinition("a"),
-            ["range", "required"],
-            [],
-            None,
-        ),
-        # Values in some meta slots in target are varied
-        (SlotDefinition("a"), SlotDefinition("b"), [], ["name"], None),
-        # Target is missing some required meta slots, and values in some meta slots in
-        # target are varied
-        (
-            SlotDefinition("a", required=True, range="integer"),
-            SlotDefinition("b"),
-            ["range", "required"],
-            ["name"],
-            None,
-        ),
-        # Target extends base
-        (
-            SlotDefinition("a", range="integer"),
-            SlotDefinition(
-                "a",
-                range="integer",
-                required=True,
-                multivalued=False,
-                mixins=["b"],
-                description="Hello, world!",
+class TestGetSlotUsageEntry:
+    @pytest.mark.parametrize(
+        ("base", "target"),
+        [
+            (SlotDefinition("a"), SlotDefinition("b")),
+            (
+                SlotDefinition("c", required=True, range="integer"),
+                SlotDefinition("d"),
             ),
-            [],
-            [],
-            SlotDefinition(
-                "a",
-                required=True,
-                multivalued=False,
-                mixins=["b"],
-                description="Hello, world!",
-            ),
-        ),
-    ],
-)
-def test_get_slot_usage_entry(
-    base, target, expected_missing, expected_varied, expected_return
-):
-    if expected_missing or expected_varied:
-        with pytest.raises(SlotExtensionError) as exc_info:
+        ],
+    )
+    def test_name_mismatch(self, base, target):
+        with pytest.raises(ValueError, match="must have the same name"):
             get_slot_usage_entry(base, target)
-        error = exc_info.value
-        assert error.missing_meta_slots == expected_missing
-        assert error.varied_meta_slots == expected_varied
-    else:
-        assert get_slot_usage_entry(base, target) == expected_return
+
+    @pytest.mark.parametrize(
+        (
+            "base",
+            "target",
+            "expected_missing",
+            "expected_constraint_varied",
+            "expected_return",
+        ),
+        [
+            # Base and target are the same
+            (SlotDefinition("a"), SlotDefinition("a"), [], [], None),
+            (
+                SlotDefinition("a", required=True, range="integer"),
+                SlotDefinition("a", required=True, range="integer"),
+                [],
+                [],
+                None,
+            ),
+            # Target is missing some required meta slots
+            (
+                SlotDefinition("a", required=True, range="integer"),
+                SlotDefinition("a"),
+                ["range", "required"],
+                [],
+                None,
+            ),
+            # Target extends base
+            (
+                SlotDefinition("a", range="integer"),
+                SlotDefinition(
+                    "a",
+                    range="integer",
+                    required=True,
+                    multivalued=False,
+                    mixins=["b"],
+                    description="Hello, world!",
+                ),
+                [],
+                [],
+                SlotDefinition(
+                    "a",
+                    required=True,
+                    multivalued=False,
+                    mixins=["b"],
+                    description="Hello, world!",
+                ),
+            ),
+            # Non-constraint varied property succeeds
+            (
+                SlotDefinition("a", description="old"),
+                SlotDefinition("a", description="new"),
+                [],
+                [],
+                SlotDefinition("a", description="new"),
+            ),
+            # Mixed non-constraint varied + extended properties
+            (
+                SlotDefinition("a", title="T1"),
+                SlotDefinition("a", title="T2", required=True),
+                [],
+                [],
+                SlotDefinition("a", title="T2", required=True),
+            ),
+            # Constraint varied property still raises
+            (
+                SlotDefinition("a", range="integer"),
+                SlotDefinition("a", range="string"),
+                [],
+                ["range"],
+                None,
+            ),
+            # Mixed constraint + non-constraint varied: only constraint reported
+            (
+                SlotDefinition("a", range="integer", description="old"),
+                SlotDefinition("a", range="string", description="new"),
+                [],
+                ["range"],
+                None,
+            ),
+        ],
+    )
+    def test_slot_usage_entry(
+        self,
+        base,
+        target,
+        expected_missing,
+        expected_constraint_varied,
+        expected_return,
+    ):
+        if expected_missing or expected_constraint_varied:
+            with pytest.raises(SlotExtensionError) as exc_info:
+                get_slot_usage_entry(base, target)
+            error = exc_info.value
+            assert error.missing_meta_slots == expected_missing
+            assert error.varied_constraint_meta_slots == expected_constraint_varied
+        else:
+            assert get_slot_usage_entry(base, target) == expected_return
 
 
 class TestCanonicalizeSchemaYml:
