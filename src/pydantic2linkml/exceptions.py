@@ -53,10 +53,13 @@ class TranslationNotImplementedError(NotImplementedError):
         )
 
 
-class SlotExtensionError(Exception):
+class SlotUsageGenerationError(Exception):
     """
-    Raise when a given base slot definition cannot be extended to achieve the behavior
-    of a given target slot definition through a slot usage entry in a class definition
+    Raise when a slot usage entry cannot be generated to make a given base slot
+    definition function like a given target slot definition. A slot usage entry can
+    only extend the base with new properties (meta slots) or override non-constraint
+    properties of the base; it cannot remove properties from the base nor override
+    its constraint properties (those defined in ``SlotExpression``).
     """
 
     def __init__(

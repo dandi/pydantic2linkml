@@ -127,8 +127,10 @@ Options:
    - `NameCollisionError` — duplicate class/enum names across modules
    - `GeneratorReuseError` — attempting to reuse a single-use generator
    - `TranslationNotImplementedError` — schema type not yet handled
-   - `SlotExtensionError` — cannot extend a base slot to match a target
-     via slot_usage
+   - `SlotUsageGenerationError` — cannot generate a slot_usage entry to
+     make a base slot function like a target slot (a slot_usage entry can
+     only extend the base slot with new properties or override the base
+     slot's non-constraint properties)
    - `YAMLContentError` — YAML file content is not what is expected (e.g.,
      not a mapping)
    - `InvalidLinkMLSchemaError` — schema does not conform to the LinkML

@@ -13,7 +13,7 @@ from pydantic_core import core_schema
 from pydantic2linkml.exceptions import (
     InvalidLinkMLSchemaError,
     NameCollisionError,
-    SlotExtensionError,
+    SlotUsageGenerationError,
     YAMLContentError,
 )
 from pydantic2linkml.tools import (
@@ -688,7 +688,7 @@ class TestGetSlotUsageEntry:
         expected_return,
     ):
         if expected_missing or expected_constraint_varied:
-            with pytest.raises(SlotExtensionError) as exc_info:
+            with pytest.raises(SlotUsageGenerationError) as exc_info:
                 get_slot_usage_entry(base, target)
             error = exc_info.value
             assert error.missing_meta_slots == expected_missing
