@@ -905,7 +905,31 @@ class SlotGenerator:
                 f"`{expected}`. LinkML has direct support for only string "
                 f"and integer elements in expressing such a restriction."
             )
+        elif len(literal_types) == 1:
+            # All literals are of the same type, which is either `str` or `int`
+            literal_type = literal_types.pop()
+
+            if literal_type is str:
+                range_ = "string"
+                equals_attr = "equals_string"
+            else:
+                range_ = "integer"
+                equals_attr = "equals_number"
+
+            self._slot.range = range_
+
+            if len(expected) == 1:
+                # There is only one literal
+                literal = expected[0]
+                setattr(self._slot, equals_attr, literal)
+            else:
+                # There are multiple literals
+                self._slot.any_of = [
+                    AnonymousSlotExpression(**{equals_attr: literal})
+                    for literal in expected
+                ]
         else:
+            # The literals are of different types, which are `str` and `int`.
             self._slot.range = "Any"
             self._slot.any_of = [
                 (
