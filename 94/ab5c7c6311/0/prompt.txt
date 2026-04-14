@@ -1,0 +1,39 @@
+I think `SlotExtensionError` should be rename since it raises not only when the definition can not be extended specically but it is because a slot definition can be modified by `slot_usage` definition in general. If the renaming should be done, I think documentation should be adjusted as well.
+
+---
+
+What about `SlotUsageGenerationError`?
+
+---
+
+sure
+
+---
+
+are you sure the word "reconcile" is the right word to use? Basically, a slot usage entry override some aspect of the base slot or extend it to make it to function like the target slot.
+
+---
+
+I think we need to be very specific about the overriding is only done to non-constraint properties or meta slots.
+
+---
+
+sure
+
+---
+
+let's make sure all the ruff checks and type checks pass as well.
+
+---
+
+I think instead of "slot_usage can only
+     extend with new properties and override non-constraint properties", it should be some what like "slot_usage can only
+     extend the base slot with new properties or  override the base slot with non-constraint properties"
+
+---
+
+I made some small changes, please check.
+
+---
+
+If you are OK, let's commit and submit a PR.

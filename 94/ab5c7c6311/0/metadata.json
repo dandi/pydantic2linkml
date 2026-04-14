@@ -1,0 +1,114 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "94ab5c7c6311",
+  "session_id": "12dd7990-ed47-4bf0-b5c2-9233fb741933",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-14T06:42:38.184768Z",
+  "branch": "rename-slot-extension-error",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "CLAUDE.md",
+    "src/pydantic2linkml/exceptions.py",
+    "src/pydantic2linkml/gen_linkml.py",
+    "src/pydantic2linkml/tools.py",
+    "tests/test_tools.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-6",
+  "turn_id": "f3bca37d6b0f",
+  "token_usage": {
+    "input_tokens": 98,
+    "cache_creation_tokens": 52374,
+    "cache_read_tokens": 1656685,
+    "output_tokens": 10196,
+    "api_call_count": 43
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-14T06:42:38.069105Z",
+    "agent_lines": 16,
+    "agent_removed": 10,
+    "human_added": 0,
+    "human_modified": 8,
+    "human_removed": 0,
+    "total_committed": 21,
+    "total_lines_changed": 34,
+    "agent_percentage": 76.47058823529412,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 17,
+      "agent_lines_removed": 15
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 17,
+      "agent_lines_removed": 15
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 17,
+      "agent_lines_removed": 15
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 22,
+      "agent_lines_removed": 15
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 22,
+      "agent_lines_removed": 15
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 5,
+      "user_lines_removed": 5,
+      "agent_lines_added": 23,
+      "agent_lines_removed": 15,
+      "user_added_per_file": {
+        "src/pydantic2linkml/exceptions.py": 1,
+        "src/pydantic2linkml/tools.py": 4
+      },
+      "user_removed_per_file": {
+        "src/pydantic2linkml/exceptions.py": 1,
+        "src/pydantic2linkml/tools.py": 4
+      }
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 26,
+      "agent_lines_removed": 18
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 26,
+      "agent_lines_removed": 18
+    }
+  ]
+}
