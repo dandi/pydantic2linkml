@@ -608,31 +608,67 @@ class TestSlotGenerator:
             )
 
     @pytest.mark.parametrize(
-        ("literal_specs", "are_literals_supported", "any_of_slot_value"),
+        ("literal_specs", "are_literals_supported", "expected_slot_attrs"),
         [
-            (
-                Literal[4, "hello", 1, "you"],
-                True,
-                [
-                    AnonymousSlotExpression(range="integer", equals_number=4),
-                    AnonymousSlotExpression(range="string", equals_string="hello"),
-                    AnonymousSlotExpression(range="integer", equals_number=1),
-                    AnonymousSlotExpression(range="string", equals_string="you"),
-                ],
-            ),
+            # Single string literal
             (
                 Literal["hello"],
                 True,
-                [
-                    AnonymousSlotExpression(range="string", equals_string="hello"),
-                ],
+                {"range": "string", "equals_string": "hello"},
             ),
+            # Single integer literal
+            (
+                Literal[42],
+                True,
+                {"range": "integer", "equals_number": 42},
+            ),
+            # Multiple string literals
+            (
+                Literal["hello", "world"],
+                True,
+                {
+                    "range": "string",
+                    "any_of": [
+                        AnonymousSlotExpression(equals_string="hello"),
+                        AnonymousSlotExpression(equals_string="world"),
+                    ],
+                },
+            ),
+            # Multiple integer literals
+            (
+                Literal[1, 2, 3],
+                True,
+                {
+                    "range": "integer",
+                    "any_of": [
+                        AnonymousSlotExpression(equals_number=1),
+                        AnonymousSlotExpression(equals_number=2),
+                        AnonymousSlotExpression(equals_number=3),
+                    ],
+                },
+            ),
+            # Mixed string and integer literals
+            (
+                Literal[4, "hello", 1, "you"],
+                True,
+                {
+                    "range": "Any",
+                    "any_of": [
+                        AnonymousSlotExpression(range="integer", equals_number=4),
+                        AnonymousSlotExpression(range="string", equals_string="hello"),
+                        AnonymousSlotExpression(range="integer", equals_number=1),
+                        AnonymousSlotExpression(range="string", equals_string="you"),
+                    ],
+                },
+            ),
+            # Unsupported: contains `None`
             (Literal[4, "hello", 1, None, "you"], False, None),
+            # Unsupported: `bool` literal
             (Literal[True], False, None),
         ],
     )
     def test_literal_schema(
-        self, literal_specs, are_literals_supported, any_of_slot_value
+        self, literal_specs, are_literals_supported, expected_slot_attrs
     ):
 
         class Foo(BaseModel):
@@ -647,8 +683,10 @@ class TestSlotGenerator:
         )
 
         if are_literals_supported:
-            assert slot.range == "Any"
-            assert slot.any_of == any_of_slot_value
+            assert slot.range == expected_slot_attrs["range"]
+            assert slot.equals_string == expected_slot_attrs.get("equals_string")
+            assert slot.equals_number == expected_slot_attrs.get("equals_number")
+            assert slot.any_of == expected_slot_attrs.get("any_of", [])
         else:
             # The `range` and `any_of` meta slots should be unset
             assert slot.range is None
