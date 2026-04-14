@@ -33,7 +33,7 @@ from pydantic_core import core_schema
 
 from pydantic2linkml.exceptions import (
     GeneratorReuseError,
-    SlotExtensionError,
+    SlotUsageGenerationError,
     TranslationNotImplementedError,
 )
 from pydantic2linkml.tools import (
@@ -334,7 +334,7 @@ class LinkmlGenerator:
                 entry = get_slot_usage_entry(
                     overridden_field_slot_rep, overriding_field_slot_rep
                 )
-            except SlotExtensionError as e:
+            except SlotUsageGenerationError as e:
                 # Attach needed note
                 missing_substr = (
                     f"lacks meta slots: {e.missing_meta_slots} "

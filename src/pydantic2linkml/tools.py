@@ -29,7 +29,7 @@ from pydantic_core import core_schema
 from pydantic2linkml.exceptions import (
     InvalidLinkMLSchemaError,
     NameCollisionError,
-    SlotExtensionError,
+    SlotUsageGenerationError,
     YAMLContentError,
 )
 
@@ -529,10 +529,13 @@ def get_slot_usage_entry(
         identical from a slot_usage perspective, ``None`` is returned.
 
     :raises ValueError: If ``base.name`` and ``target.name`` differ
-    :raises SlotExtensionError: If the given base slot definition cannot be
-        extended or overridden to achieve the behavior of the given target
-        slot definition through a slot usage entry in a class definition,
-        due to missing properties or differing constraint properties
+    :raises SlotUsageGenerationError: If a slot usage entry cannot be
+        generated to make the given base slot definition function like the
+        given target slot definition. A slot usage entry can only extend the
+        base with new properties (meta slots) or override non-constraint
+        properties of the base; it cannot remove properties from the base
+        nor override its constraint properties (those defined in
+        ``SlotExpression``).
     """
     if base.name != target.name:
         raise ValueError(
@@ -557,7 +560,7 @@ def get_slot_usage_entry(
     overridable_varied = varied_properties - SLOT_EXPRESSION_FIELD_NAMES
 
     if missing_properties or constraint_varied:
-        raise SlotExtensionError(
+        raise SlotUsageGenerationError(
             missing_meta_slots=sorted(missing_properties, key=str.casefold),
             varied_constraint_meta_slots=sorted(constraint_varied, key=str.casefold),
         )
