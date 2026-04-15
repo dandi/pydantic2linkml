@@ -561,8 +561,8 @@ def get_slot_usage_entry(
 
     if missing_properties or constraint_varied:
         raise SlotUsageGenerationError(
-            missing_meta_slots=sorted(missing_properties, key=str.casefold),
-            varied_constraint_meta_slots=sorted(constraint_varied, key=str.casefold),
+            missing_meta_slots=missing_properties,
+            varied_constraint_meta_slots=constraint_varied,
         )
 
     extended_properties = target_properties - base_properties

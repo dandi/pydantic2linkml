@@ -130,7 +130,9 @@ Options:
    - `SlotUsageGenerationError` — cannot generate a slot_usage entry to
      make a base slot function like a target slot (a slot_usage entry can
      only extend the base slot with new properties or override the base
-     slot's non-constraint properties)
+     slot's non-constraint properties); accepts any `Iterable[str]` for
+     its meta-slot lists and sorts them case-insensitively on
+     construction
    - `YAMLContentError` — YAML file content is not what is expected (e.g.,
      not a mapping)
    - `InvalidLinkMLSchemaError` — schema does not conform to the LinkML
