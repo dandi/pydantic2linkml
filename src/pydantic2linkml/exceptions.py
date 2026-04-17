@@ -69,28 +69,28 @@ class SlotUsageGenerationError(Exception):
         varied_constraint_meta_slots: Optional[Iterable[str]] = None,
     ):
         """
-        :param missing_meta_slots: The meta slots that exist in the base
-            slot definition but not in the target slot definition. The
-            items are sorted case-insensitively. If None or not provided,
+        :param missing_meta_slots: The input for setting
+            ``self.missing_meta_slots``, which is a list of the items
+            provided in this input sorted case-insensitively. These items
+            are the meta slots that exist in the base slot definition but
+            not in the target slot definition. If None or not provided,
             an empty list is used.
-        :param varied_constraint_meta_slots: The constraint meta slots
-            (i.e., those defined in ``SlotExpression``) that exist in
-            both the base and target slot definitions but have different
-            values. The items are sorted case-insensitively. If None or
-            not provided, an empty list is used.
+        :param varied_constraint_meta_slots: The input for setting
+            ``self.varied_constraint_meta_slots``, which is a list of the
+            items provided in this input sorted case-insensitively. These
+            items are the constraint meta slots (i.e., those defined in
+            ``SlotExpression``) that exist in both the base and target
+            slot definitions but have different values. If None or not
+            provided, an empty list is used.
         :raises ValueError: If both `missing_meta_slots` and
             `varied_constraint_meta_slots` are empty
         """
-        sorted_missing: list[str] = (
-            sorted(missing_meta_slots, key=str.casefold)
-            if missing_meta_slots is not None
-            else []
-        )
-        sorted_constraint: list[str] = (
-            sorted(varied_constraint_meta_slots, key=str.casefold)
-            if varied_constraint_meta_slots is not None
-            else []
-        )
+
+        def _sort(items: Optional[Iterable[str]]) -> list[str]:
+            return sorted(items, key=str.casefold) if items is not None else []
+
+        sorted_missing: list[str] = _sort(missing_meta_slots)
+        sorted_constraint: list[str] = _sort(varied_constraint_meta_slots)
 
         if len(sorted_missing) + len(sorted_constraint) == 0:
             error_msg = (
