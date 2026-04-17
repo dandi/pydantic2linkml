@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Optional
 
 # noinspection PyProtectedMember
@@ -64,26 +65,34 @@ class SlotUsageGenerationError(Exception):
 
     def __init__(
         self,
-        missing_meta_slots: Optional[list[str]] = None,
-        varied_constraint_meta_slots: Optional[list[str]] = None,
+        missing_meta_slots: Optional[Iterable[str]] = None,
+        varied_constraint_meta_slots: Optional[Iterable[str]] = None,
     ):
         """
-        :param missing_meta_slots: The meta slots that exist in the base slot definition
-            but not in the target slot definition. If None or not provided, an empty
-            list is used.
-        :param varied_constraint_meta_slots: The constraint meta slots (i.e., those
-            defined in ``SlotExpression``) that exist in both the base and target slot
-            definitions but have different values. If None or not provided, an empty
-            list is used.
+        :param missing_meta_slots: The input for setting
+            ``self.missing_meta_slots``, which is a list of the items
+            provided in this input sorted case-insensitively. These items
+            are the meta slots that exist in the base slot definition but
+            not in the target slot definition. If None or not provided,
+            an empty list is used.
+        :param varied_constraint_meta_slots: The input for setting
+            ``self.varied_constraint_meta_slots``, which is a list of the
+            items provided in this input sorted case-insensitively. These
+            items are the constraint meta slots (i.e., those defined in
+            ``SlotExpression``) that exist in both the base and target
+            slot definitions but have different values. If None or not
+            provided, an empty list is used.
         :raises ValueError: If both `missing_meta_slots` and
             `varied_constraint_meta_slots` are empty
         """
-        if missing_meta_slots is None:
-            missing_meta_slots = []
-        if varied_constraint_meta_slots is None:
-            varied_constraint_meta_slots = []
 
-        if len(missing_meta_slots) + len(varied_constraint_meta_slots) == 0:
+        def _sort(items: Optional[Iterable[str]]) -> list[str]:
+            return sorted(items, key=str.casefold) if items is not None else []
+
+        sorted_missing: list[str] = _sort(missing_meta_slots)
+        sorted_constraint: list[str] = _sort(varied_constraint_meta_slots)
+
+        if len(sorted_missing) + len(sorted_constraint) == 0:
             error_msg = (
                 "At least one of `missing_meta_slots` and "
                 "`varied_constraint_meta_slots` must be non-empty."
@@ -92,8 +101,8 @@ class SlotUsageGenerationError(Exception):
 
         super().__init__()
 
-        self.missing_meta_slots: list[str] = missing_meta_slots
-        self.varied_constraint_meta_slots: list[str] = varied_constraint_meta_slots
+        self.missing_meta_slots: list[str] = sorted_missing
+        self.varied_constraint_meta_slots: list[str] = sorted_constraint
 
     def __str__(self):
         return (
