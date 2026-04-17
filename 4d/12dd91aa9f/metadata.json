@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "4d12dd91aa9f",
+  "strategy": "manual-commit",
+  "branch": "fork/dandi/copilot/let-slotusagegenerationerror-sort-meta-slots",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "src/pydantic2linkml/exceptions.py",
+    "tests/test_exceptions.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4d/12dd91aa9f/0/metadata.json",
+      "transcript": "/4d/12dd91aa9f/0/full.jsonl",
+      "content_hash": "/4d/12dd91aa9f/0/content_hash.txt",
+      "prompt": "/4d/12dd91aa9f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 54,
+    "cache_creation_tokens": 114414,
+    "cache_read_tokens": 1206452,
+    "output_tokens": 12080,
+    "api_call_count": 29
+  }
+}

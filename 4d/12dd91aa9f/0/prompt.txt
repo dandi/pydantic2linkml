@@ -1,0 +1,19 @@
+let's take a look at the PR at https://github.com/dandi/pydantic2linkml/pull/59. Let me know what you think. The branch of the PR is already checked out locally.
+
+In the docstring of the constructor of `SlotUsageGenerationError`, I think there need to be a mention, for each input, that the input is for settting the corresponding attribute before describing the attribute is a list of sorted items provided in the input.
+
+I think we can define `sorted_missing` and `sorted_constraint` using an internal function to reduce code duplication.
+
+I also added some TODOs in the test file, please do make changes accordingly.
+
+---
+
+Do you think the `test_str` and `test_repr` are a bit brittle? For example, can we rely on the string reprenentation of string type to use single quotes, for example?
+
+---
+
+apply this
+
+---
+
+I have made some changes, please check
