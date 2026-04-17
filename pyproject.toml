@@ -100,6 +100,10 @@ check-hidden = true
 [tool.mypy]
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = "linkml_runtime.*"
+ignore_missing_imports = true
+
 [tool.ruff]
 line-length = 88
 indent-width = 4

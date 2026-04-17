@@ -370,11 +370,11 @@ class TestSlotGenerator:
             (r"^[a-zA-Z0-9]+", 3, 2, r"^(?=.{2,3}$)[a-zA-Z0-9]+"),
             (r"^[a-zA-Z0-9]+", None, 2, r"^(?=.{2,}$)[a-zA-Z0-9]+"),
             (r"^[a-zA-Z0-9]+", 3, None, r"^(?=.{,3}$)[a-zA-Z0-9]+"),
-            (ptrn := r"^[a-zA-Z0-9]+", None, None, ptrn),
+            (r"^[a-zA-Z0-9]+", None, None, r"^[a-zA-Z0-9]+"),
             (r".*", 10, 4, r"^(?=.{4,10}$).*"),
             (r".*", None, 4, r"^(?=.{4,}$).*"),
             (r".*", 10, None, r"^(?=.{,10}$).*"),
-            (ptrn := r".*", None, None, ptrn),
+            (r".*", None, None, r".*"),
             (None, None, None, None),
         ],
     )
