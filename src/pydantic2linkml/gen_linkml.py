@@ -680,44 +680,21 @@ class SlotGenerator:
         max_length: Optional[int] = schema.get("max_length")
         min_length: Optional[int] = schema.get("min_length")
 
-        if max_length is not None:
-            self._attach_note(
-                "LinkML does not have direct support for max length constraints. "
-                f"The max length constraint of {max_length} is incorporated "
-                "into the pattern of the slot."
-            )
-
-        if min_length is not None:
-            self._attach_note(
-                "LinkML does not have direct support for min length constraints. "
-                f"The min length constraint of {min_length} is incorporated "
-                "into the pattern of the slot."
-            )
-
-        # == Incorporate any length constraints into the pattern of the slot ==
+        # == Express any length constraint as a pattern in the slot's `all_of` ==
+        # [\s\S] admits newlines (Pydantic counts them); \Z anchors to the true
+        # end of the string (unlike `$`, which also matches before a trailing
+        # newline under Python's `re`).
         if max_length is not None or min_length is not None:
-            length_constraint_regex = (
-                f"^(?=."
-                f"{{{min_length if min_length is not None else ''},"
-                f"{max_length if max_length is not None else ''}}}$)"
+            lo = min_length if min_length is not None else ""
+            hi = max_length if max_length is not None else ""
+            self._slot.all_of.append(
+                AnonymousSlotExpression(pattern=rf"^[\s\S]{{{lo},{hi}}}\Z")
             )
-
-            orig_ptrn = self._slot.pattern
-            if orig_ptrn is not None:
-                # == There is an existing pattern carried over
-                # from the Pydantic core schema ==
-
-                # Update the pattern to include the length constraint
-                self._slot.pattern = (
-                    f"{length_constraint_regex}"
-                    f"{orig_ptrn[1:] if orig_ptrn.startswith('^') else orig_ptrn}"
-                )
-            else:
-                # == There is no existing pattern carried over
-                # from the Pydantic core schema ==
-
-                # Set the pattern to the length constraint
-                self._slot.pattern = length_constraint_regex
+            self._attach_note(
+                f"Length constraint of min_length={min_length}, "
+                f"max_length={max_length} expressed as a pattern entry in the "
+                "slot's `all_of`."
+            )
 
         if schema.get("strip_whitespace"):
             self._attach_note(
@@ -1299,17 +1276,22 @@ class SlotGenerator:
 
         self._slot.range = "uri"
 
-        # Incorporate `max_length` and `allowed_schemes` restrictions into the pattern
-        # meta slot
+        # Express `allowed_schemes` restriction in the pattern meta slot
         max_length: Optional[int] = schema.get("max_length")
         allowed_schemes: Optional[list[str]] = schema.get("allowed_schemes")
-        max_length_re = rf"(?=.{{,{max_length}}}$)" if max_length is not None else ""
         allowed_schemes_re = (
             rf"(?i:{'|'.join(re.escape(scheme) for scheme in allowed_schemes)})"
             if allowed_schemes is not None
             else r"[^\s]+"
         )
-        self._slot.pattern = rf"^{max_length_re}{allowed_schemes_re}://[^\s]+$"
+        self._slot.pattern = rf"^{allowed_schemes_re}://[^\s]+$"
+
+        # Express any `max_length` restriction as a pattern entry in `all_of`.
+        # [\s\S] admits newlines; \Z anchors to the true end of the string.
+        if max_length is not None:
+            self._slot.all_of.append(
+                AnonymousSlotExpression(pattern=rf"^[\s\S]{{,{max_length}}}\Z")
+            )
 
         if "host_required" in schema:
             self._attach_note("Unable to express the `host_required` option in LinkML.")
