@@ -155,6 +155,15 @@ Options:
 - Group related tests into a class.
 - Use parametrization to reduce code duplication.
 
+## Python Language Usage
+
+- Write Python code using the latest Python features supported by the
+  project (see the minimum version and matrix in `pyproject.toml`) when
+  they make the code easier to read and maintain. For example, the
+  `match` statement (available since Python 3.10) is especially helpful
+  in this project, where `SlotGenerator` dispatches on Pydantic
+  `core_schema` `type` strings.
+
 ## Workflow Preferences
 
 - Hatch environments use **uv** as the installer. Use
