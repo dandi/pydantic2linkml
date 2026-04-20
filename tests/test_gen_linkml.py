@@ -362,19 +362,19 @@ class TestSlotGenerator:
         verify_notes(f"greater than {gt}", gt is not None)
 
     @pytest.mark.parametrize(
-        ("pattern", "max_length", "min_length", "output_pattern"),
+        ("pattern", "max_length", "min_length", "expected_all_of_pattern"),
         [
-            (None, 10, 4, r"^(?=.{4,10}$)"),
-            (None, None, 4, r"^(?=.{4,}$)"),
-            (None, 10, None, r"^(?=.{,10}$)"),
-            (r"^[a-zA-Z0-9]+", 3, 2, r"^(?=.{2,3}$)[a-zA-Z0-9]+"),
-            (r"^[a-zA-Z0-9]+", None, 2, r"^(?=.{2,}$)[a-zA-Z0-9]+"),
-            (r"^[a-zA-Z0-9]+", 3, None, r"^(?=.{,3}$)[a-zA-Z0-9]+"),
-            (ptrn := r"^[a-zA-Z0-9]+", None, None, ptrn),
-            (r".*", 10, 4, r"^(?=.{4,10}$).*"),
-            (r".*", None, 4, r"^(?=.{4,}$).*"),
-            (r".*", 10, None, r"^(?=.{,10}$).*"),
-            (ptrn := r".*", None, None, ptrn),
+            (None, 10, 4, r"^[\s\S]{4,10}\Z"),
+            (None, None, 4, r"^[\s\S]{4,}\Z"),
+            (None, 10, None, r"^[\s\S]{,10}\Z"),
+            (r"^[a-zA-Z0-9]+", 3, 2, r"^[\s\S]{2,3}\Z"),
+            (r"^[a-zA-Z0-9]+", None, 2, r"^[\s\S]{2,}\Z"),
+            (r"^[a-zA-Z0-9]+", 3, None, r"^[\s\S]{,3}\Z"),
+            (r"^[a-zA-Z0-9]+", None, None, None),
+            (r".*", 10, 4, r"^[\s\S]{4,10}\Z"),
+            (r".*", None, 4, r"^[\s\S]{4,}\Z"),
+            (r".*", 10, None, r"^[\s\S]{,10}\Z"),
+            (r".*", None, None, None),
             (None, None, None, None),
         ],
     )
@@ -389,7 +389,7 @@ class TestSlotGenerator:
         strip_whitespace,
         to_lower,
         to_upper,
-        output_pattern,
+        expected_all_of_pattern,
     ):
         class Foo(BaseModel):
             # noinspection PyTypeHints
@@ -409,14 +409,19 @@ class TestSlotGenerator:
         verify_notes = partial(verify_str_lst, str_lst=slot.notes)
 
         assert slot.range == "string"
-        assert slot.pattern == output_pattern
+        # The Pydantic-supplied pattern (if any) is carried over untouched.
+        assert slot.pattern == pattern
+        if expected_all_of_pattern is None:
+            assert slot.all_of == []
+        else:
+            assert slot.all_of == [
+                AnonymousSlotExpression(pattern=expected_all_of_pattern)
+            ]
         verify_notes(
-            f"The max length constraint of {max_length} is incorporated",
-            max_length is not None,
-        )
-        verify_notes(
-            f"The min length constraint of {min_length} is incorporated",
-            min_length is not None,
+            "Length constraint of "
+            f"min_length={min_length}, max_length={max_length} "
+            "expressed as a pattern entry in the slot's `all_of`",
+            max_length is not None or min_length is not None,
         )
         verify_notes(
             "stripping leading and trailing whitespace in LinkML",
@@ -1087,10 +1092,10 @@ class TestSlotGenerator:
     @pytest.mark.parametrize(
         ("max_length", "allowed_schemes", "expected_pattern"),
         [
-            (100, ["http", "https"], r"^(?=.{,100}$)(?i:http|https)://[^\s]+$"),
-            (42, ["http"], r"^(?=.{,42}$)(?i:http)://[^\s]+$"),
+            (100, ["http", "https"], r"^(?i:http|https)://[^\s]+$"),
+            (42, ["http"], r"^(?i:http)://[^\s]+$"),
             (None, ["http", "https"], r"^(?i:http|https)://[^\s]+$"),
-            (50, None, r"^(?=.{,50}$)[^\s]+://[^\s]+$"),
+            (50, None, r"^[^\s]+://[^\s]+$"),
             (None, None, r"^[^\s]+://[^\s]+$"),
         ],
     )
@@ -1126,6 +1131,12 @@ class TestSlotGenerator:
 
         assert slot.range == "uri"
         assert slot.pattern == expected_pattern
+        if max_length is None:
+            assert slot.all_of == []
+        else:
+            assert slot.all_of == [
+                AnonymousSlotExpression(pattern=rf"^[\s\S]{{,{max_length}}}\Z")
+            ]
         verify_notes(
             "Unable to express the `host_required` option in LinkML.",
             host_required is not None,
