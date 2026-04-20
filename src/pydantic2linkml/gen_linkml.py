@@ -907,7 +907,7 @@ class SlotGenerator:
                 ]
         else:
             # The literals are of different types, which are `str` and `int`.
-            self._slot.range = "Any"
+            self._slot.range = ANY_CLASS_DEF.name
             self._slot.any_of = [
                 (
                     AnonymousSlotExpression(equals_string=literal, range="string")
