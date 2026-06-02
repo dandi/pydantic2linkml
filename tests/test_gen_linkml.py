@@ -306,9 +306,11 @@ class TestSlotGenerator:
         verify_notes = partial(verify_str_lst, str_lst=slot.notes)
 
         assert slot.range == "float"
+        # `float` permits inf/nan by default (allow_inf_nan=True); the note flags the
+        # untranslatable restriction, so it fires only when explicitly forbidden.
         verify_notes(
-            "LinkML does not have support for `'+inf'`, `'-inf'`, and `'NaN'`",
-            allow_inf_nan is None or allow_inf_nan,
+            "restriction disallowing `'+inf'`, `'-inf'`, and `'NaN'`",
+            allow_inf_nan is False,
         )
         verify_notes(f"multiple of {multiple_of}", multiple_of is not None)
         assert slot.maximum_value == le
@@ -347,9 +349,11 @@ class TestSlotGenerator:
         verify_notes = partial(verify_str_lst, str_lst=slot.notes)
 
         assert slot.range == "decimal"
+        # `Decimal` forbids inf/nan by default (allow_inf_nan=False); the note flags the
+        # untranslatable restriction, so it fires whenever forbidden (default or False).
         verify_notes(
-            "LinkML does not have support for `'+inf'`, `'-inf'`, and `'NaN'`",
-            allow_inf_nan,
+            "restriction disallowing `'+inf'`, `'-inf'`, and `'NaN'`",
+            not allow_inf_nan,
         )
         verify_notes(f"max number of {max_digits} digits", max_digits is not None)
         verify_notes(

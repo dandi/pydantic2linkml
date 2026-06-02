@@ -582,10 +582,16 @@ class SlotGenerator:
             restriction
         """
         self._slot.range = "float"
-        if "allow_inf_nan" not in schema or schema["allow_inf_nan"]:
+        # A Pydantic `float` defaults to `allow_inf_nan=True` (inf/nan permitted),
+        # and the key is present in the core schema only when set explicitly. LinkML
+        # cannot express a restriction forbidding these values, so warn only when the
+        # source forbids them (`allow_inf_nan=False`); the permissive default needs no
+        # note, since the LinkML translation permits inf/nan regardless.
+        if schema.get("allow_inf_nan") is False:
             self._attach_note(
-                "LinkML does not have support for `'+inf'`, `'-inf'`, and `'NaN'` "
-                "values. Support for these values is not translated."
+                "LinkML cannot express the restriction disallowing `'+inf'`, "
+                "`'-inf'`, and `'NaN'` values; these values are accepted by the "
+                "translated schema despite the source restriction."
             )
         if "multiple_of" in schema:
             self._attach_note(
@@ -618,10 +624,15 @@ class SlotGenerator:
         """
         self._slot.range = "decimal"
 
-        if schema.get("allow_inf_nan"):
+        # A Pydantic `Decimal` defaults to `allow_inf_nan=False` (inf/nan forbidden),
+        # and the key is present in the core schema only when set explicitly. LinkML
+        # cannot express that restriction, so warn whenever the source forbids these
+        # values — i.e. by default (key absent) or explicitly (`allow_inf_nan=False`).
+        if not schema.get("allow_inf_nan"):
             self._attach_note(
-                "LinkML does not have support for `'+inf'`, `'-inf'`, and `'NaN'` "
-                "values. Support for these values is not translated."
+                "LinkML cannot express the restriction disallowing `'+inf'`, "
+                "`'-inf'`, and `'NaN'` values; these values are accepted by the "
+                "translated schema despite the source restriction."
             )
         if "multiple_of" in schema:
             self._attach_note(
