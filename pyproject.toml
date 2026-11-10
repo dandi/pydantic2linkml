@@ -28,6 +28,8 @@ classifiers = [
 ]
 dependencies = [
   "deepmerge",
+  # curies 0.15.2 fails to import with Pydantic 2.10 (curies#251).
+  "curies<0.15.2",
   "linkml",
   "pydantic~=2.7,<2.11",
   "PyYAML",

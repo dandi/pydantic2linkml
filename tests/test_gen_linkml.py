@@ -23,9 +23,10 @@ from pydantic import (
     WrapValidator,
     condate,
     conlist,
+    field_validator,
 )
 
-from pydantic2linkml.gen_linkml import LinkmlGenerator, SlotGenerator, ANY_CLASS_DEF
+from pydantic2linkml.gen_linkml import ANY_CLASS_DEF, LinkmlGenerator, SlotGenerator
 from pydantic2linkml.tools import (
     fetch_defs,
     get_all_modules,
@@ -204,6 +205,82 @@ class TestLinkmlGenerator:
         # The top-level slot should not claim a consistent range because
         # Base.x is int and Sub.x is str.
         assert schema.slots["x"].range is None
+
+    def test_override_of_nested_model_with_type_field(self):
+        class Payload(BaseModel):
+            type: str
+
+        class Parent(BaseModel):
+            payload: Payload
+
+        class Child(Parent):
+            payload: Payload = Field(description="Extra detail")
+
+        schema = LinkmlGenerator(models=[Payload, Parent, Child], enums=[]).generate()
+        child = schema.classes["Child"].slot_usage["payload"]
+        assert child.description == "Extra detail"
+
+    def test_validator_only_translated_on_child_keeps_warning(self):
+        class Checks:
+            @classmethod
+            def check(cls, value):
+                return value
+
+        Checked = Annotated[str, AfterValidator(Checks.check)]
+
+        class Parent(BaseModel):
+            value: dict[str, Checked]
+
+        class Child(Parent):
+            value: Checked
+
+        schema = LinkmlGenerator(models=[Parent, Child], enums=[]).generate()
+        parent = schema.classes["Parent"].slot_usage["value"]
+        child = schema.classes["Child"].slot_usage["value"]
+        assert in_no_string("Checks.check", parent.notes)
+        assert in_exactly_one_string("Checks.check", child.notes)
+
+    def test_inherited_validator_warning_is_not_repeated(self):
+        class Parent(BaseModel):
+            schemaKey: str = "Parent"
+
+            @field_validator("schemaKey")
+            @classmethod
+            def check_parent(cls, value):
+                return value
+
+        class Child(Parent):
+            schemaKey: Literal["Child"] = "Child"
+
+        class UnchangedChild(Parent):
+            schemaKey: str = "Parent"
+
+        class ChildWithValidator(Parent):
+            schemaKey: Literal["ChildWithValidator"] = "ChildWithValidator"
+
+            @field_validator("schemaKey")
+            @classmethod
+            def check_child(cls, value):
+                return value
+
+        schema = LinkmlGenerator(
+            models=[Parent, Child, UnchangedChild, ChildWithValidator], enums=[]
+        ).generate()
+        parent = schema.classes["Parent"].slot_usage["schemaKey"]
+        child = schema.classes["Child"].slot_usage["schemaKey"]
+        child_with_validator = schema.classes["ChildWithValidator"].slot_usage[
+            "schemaKey"
+        ]
+
+        assert in_exactly_one_string("check_parent", parent.notes)
+        assert in_no_string("check_parent", child.notes)
+        assert "schemaKey" not in schema.classes["UnchangedChild"].slot_usage
+        assert child.equals_string == "Child"
+        assert child.ifabsent == "string(Child)"
+        assert in_no_string("check_parent", child_with_validator.notes)
+        assert in_exactly_one_string("check_child", child_with_validator.notes)
+        assert child_with_validator.equals_string == "ChildWithValidator"
+        assert child_with_validator.ifabsent == "string(ChildWithValidator)"
 
 
 class TestSlotGenerator:

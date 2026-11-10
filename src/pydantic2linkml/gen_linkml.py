@@ -1,3 +1,4 @@
+import inspect
 import logging
 import re
 from collections import defaultdict
@@ -46,6 +47,7 @@ from pydantic2linkml.tools import (
     get_all_modules,
     get_field_schema,
     get_locally_defined_fields,
+    get_non_empty_meta_slots,
     get_parent_models,
     get_slot_usage_entry,
     get_uuid_regex,
@@ -71,6 +73,13 @@ sort_dict_by_ikeys = partial(sort_dict, key_func=lambda t: itemgetter(0)(t).case
 ANY_CLASS_DEF = ClassDefinition(
     name="Any", description="Any object", class_uri="linkml:Any"
 )
+
+
+def _validator_note(mode: str, function: Any) -> str:
+    return (
+        "Unable to translate the logic contained in "
+        f"the {mode} validation function, {function!r}."
+    )
 
 
 class LinkmlGenerator:
@@ -309,17 +318,13 @@ class LinkmlGenerator:
                 slot_usage.append(entry)
 
         # === Handle overriding fields in the model ===
-        overriding_field_slot_reps = {
-            field_name: SlotGenerator(schema).generate()
-            for field_name, schema in local_fields.overriding.items()
-        }
-
-        for name, overriding_field_slot_rep in overriding_field_slot_reps.items():
+        for name, field_schema in local_fields.overriding.items():
+            child_generator = SlotGenerator(field_schema)
+            overriding_field_slot_rep = child_generator.generate()
             for parent in parents:
                 if name in parent.model_fields:
-                    overridden_field_slot_rep = SlotGenerator(
-                        get_field_schema(parent, name)
-                    ).generate()
+                    parent_generator = SlotGenerator(get_field_schema(parent, name))
+                    overridden_field_slot_rep = parent_generator.generate()
                     break
             else:
                 # This block should not be reached
@@ -334,7 +339,16 @@ class LinkmlGenerator:
                 overridden_field_slot_rep, overriding_field_slot_rep
             )
             if entry is not None:
-                slot_usage.append(entry)
+                inherited_notes = {
+                    note
+                    for key, note in child_generator.bound_validator_notes.items()
+                    if key in parent_generator.bound_validator_notes
+                }
+                entry.notes = [
+                    note for note in entry.notes if note not in inherited_notes
+                ]
+                if get_non_empty_meta_slots(entry) != {"name"}:
+                    slot_usage.append(entry)
 
         # Ensure collections in class definition are sorted by name case-insensitively
         slots.sort(key=str.casefold)
@@ -378,6 +392,7 @@ class SlotGenerator:
             schema of the corresponding field with context
         """
         self._slot: SlotDefinition = SlotDefinition(name=field_schema.field_name)
+        self.bound_validator_notes: dict[tuple[str, Any], str] = {}
         self._field_schema: FieldSchema = field_schema
         self._schema_type_to_method = self._build_schema_type_to_method()
 
@@ -475,13 +490,15 @@ class SlotGenerator:
         ]
         shape_slot_for_specific_schema_type(schema)
 
-    def _attach_note(self, note: str) -> None:
+    def _attach_note(self, note: str) -> str:
         """
         Attach a note to the contained slot definition
 
         :param note: The note to attach
         """
-        self._slot.notes.append(format_note(note))
+        formatted = format_note(note)
+        self._slot.notes.append(formatted)
+        return formatted
 
     def _get_ase(self, subschema: core_schema.CoreSchema) -> AnonymousSlotExpression:
         """
@@ -1007,10 +1024,10 @@ class SlotGenerator:
         """
         mode = schema["type"].split("-")[1]
 
-        self._attach_note(
-            "Unable to translate the logic contained in "
-            f"the {mode} validation function, {schema['function']['function']!r}."
-        )
+        function = schema["function"]["function"]
+        note = self._attach_note(_validator_note(mode, function))
+        if inspect.ismethod(function) and isinstance(function.__self__, type):
+            self.bound_validator_notes[(mode, function.__func__)] = note
         if mode != "plain":
             self._shape_slot(schema["schema"])
 
