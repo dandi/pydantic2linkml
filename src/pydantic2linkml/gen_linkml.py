@@ -1,3 +1,4 @@
+import inspect
 import logging
 import re
 from collections import defaultdict
@@ -46,6 +47,7 @@ from pydantic2linkml.tools import (
     get_all_modules,
     get_field_schema,
     get_locally_defined_fields,
+    get_non_empty_meta_slots,
     get_parent_models,
     get_slot_usage_entry,
     get_uuid_regex,
@@ -71,6 +73,50 @@ sort_dict_by_ikeys = partial(sort_dict, key_func=lambda t: itemgetter(0)(t).case
 ANY_CLASS_DEF = ClassDefinition(
     name="Any", description="Any object", class_uri="linkml:Any"
 )
+
+
+def _validator_note(mode: str, function: Any) -> str:
+    return (
+        "Unable to translate the logic contained in "
+        f"the {mode} validation function, {function!r}."
+    )
+
+
+def _bound_validator_notes(schema: Any) -> dict[tuple[str, Any], str]:
+    """Identify class-bound validator notes by the underlying function and mode."""
+    notes = {}
+    seen = set()
+
+    def visit(value: Any) -> None:
+        if not isinstance(value, (dict, list, tuple)) or id(value) in seen:
+            return
+        seen.add(id(value))
+        if isinstance(value, dict):
+            schema_type = value.get("type")
+            if schema_type in {
+                "function-after",
+                "function-before",
+                "function-wrap",
+                "function-plain",
+            }:
+                function_info = value.get("function")
+                if isinstance(function_info, dict):
+                    function = function_info.get("function")
+                    if inspect.ismethod(function) and isinstance(
+                        function.__self__, type
+                    ):
+                        mode = schema_type.split("-", 1)[1]
+                        notes[(mode, function.__func__)] = format_note(
+                            _validator_note(mode, function)
+                        )
+            for item in value.values():
+                visit(item)
+        else:
+            for item in value:
+                visit(item)
+
+    visit(schema)
+    return notes
 
 
 class LinkmlGenerator:
@@ -317,8 +363,9 @@ class LinkmlGenerator:
         for name, overriding_field_slot_rep in overriding_field_slot_reps.items():
             for parent in parents:
                 if name in parent.model_fields:
+                    parent_field_schema = get_field_schema(parent, name)
                     overridden_field_slot_rep = SlotGenerator(
-                        get_field_schema(parent, name)
+                        parent_field_schema
                     ).generate()
                     break
             else:
@@ -334,7 +381,18 @@ class LinkmlGenerator:
                 overridden_field_slot_rep, overriding_field_slot_rep
             )
             if entry is not None:
-                slot_usage.append(entry)
+                parent_notes = _bound_validator_notes(parent_field_schema.schema)
+                child_notes = _bound_validator_notes(
+                    local_fields.overriding[name].schema
+                )
+                inherited_notes = {
+                    note for key, note in child_notes.items() if key in parent_notes
+                }
+                entry.notes = [
+                    note for note in entry.notes if note not in inherited_notes
+                ]
+                if get_non_empty_meta_slots(entry) != {"name"}:
+                    slot_usage.append(entry)
 
         # Ensure collections in class definition are sorted by name case-insensitively
         slots.sort(key=str.casefold)
@@ -1007,10 +1065,7 @@ class SlotGenerator:
         """
         mode = schema["type"].split("-")[1]
 
-        self._attach_note(
-            "Unable to translate the logic contained in "
-            f"the {mode} validation function, {schema['function']['function']!r}."
-        )
+        self._attach_note(_validator_note(mode, schema["function"]["function"]))
         if mode != "plain":
             self._shape_slot(schema["schema"])
 
