@@ -82,43 +82,6 @@ def _validator_note(mode: str, function: Any) -> str:
     )
 
 
-def _bound_validator_notes(schema: Any) -> dict[tuple[str, Any], str]:
-    """Identify class-bound validator notes by the underlying function and mode."""
-    notes = {}
-    seen = set()
-
-    def visit(value: Any) -> None:
-        if not isinstance(value, (dict, list, tuple)) or id(value) in seen:
-            return
-        seen.add(id(value))
-        if isinstance(value, dict):
-            schema_type = value.get("type")
-            if schema_type in {
-                "function-after",
-                "function-before",
-                "function-wrap",
-                "function-plain",
-            }:
-                function_info = value.get("function")
-                if isinstance(function_info, dict):
-                    function = function_info.get("function")
-                    if inspect.ismethod(function) and isinstance(
-                        function.__self__, type
-                    ):
-                        mode = schema_type.split("-", 1)[1]
-                        notes[(mode, function.__func__)] = format_note(
-                            _validator_note(mode, function)
-                        )
-            for item in value.values():
-                visit(item)
-        else:
-            for item in value:
-                visit(item)
-
-    visit(schema)
-    return notes
-
-
 class LinkmlGenerator:
     """
     Instances of this class are single-use LinkML generators.
@@ -355,18 +318,13 @@ class LinkmlGenerator:
                 slot_usage.append(entry)
 
         # === Handle overriding fields in the model ===
-        overriding_field_slot_reps = {
-            field_name: SlotGenerator(schema).generate()
-            for field_name, schema in local_fields.overriding.items()
-        }
-
-        for name, overriding_field_slot_rep in overriding_field_slot_reps.items():
+        for name, field_schema in local_fields.overriding.items():
+            child_generator = SlotGenerator(field_schema)
+            overriding_field_slot_rep = child_generator.generate()
             for parent in parents:
                 if name in parent.model_fields:
-                    parent_field_schema = get_field_schema(parent, name)
-                    overridden_field_slot_rep = SlotGenerator(
-                        parent_field_schema
-                    ).generate()
+                    parent_generator = SlotGenerator(get_field_schema(parent, name))
+                    overridden_field_slot_rep = parent_generator.generate()
                     break
             else:
                 # This block should not be reached
@@ -381,12 +339,10 @@ class LinkmlGenerator:
                 overridden_field_slot_rep, overriding_field_slot_rep
             )
             if entry is not None:
-                parent_notes = _bound_validator_notes(parent_field_schema.schema)
-                child_notes = _bound_validator_notes(
-                    local_fields.overriding[name].schema
-                )
                 inherited_notes = {
-                    note for key, note in child_notes.items() if key in parent_notes
+                    note
+                    for key, note in child_generator.bound_validator_notes.items()
+                    if key in parent_generator.bound_validator_notes
                 }
                 entry.notes = [
                     note for note in entry.notes if note not in inherited_notes
@@ -436,6 +392,7 @@ class SlotGenerator:
             schema of the corresponding field with context
         """
         self._slot: SlotDefinition = SlotDefinition(name=field_schema.field_name)
+        self.bound_validator_notes: dict[tuple[str, Any], str] = {}
         self._field_schema: FieldSchema = field_schema
         self._schema_type_to_method = self._build_schema_type_to_method()
 
@@ -533,13 +490,15 @@ class SlotGenerator:
         ]
         shape_slot_for_specific_schema_type(schema)
 
-    def _attach_note(self, note: str) -> None:
+    def _attach_note(self, note: str) -> str:
         """
         Attach a note to the contained slot definition
 
         :param note: The note to attach
         """
-        self._slot.notes.append(format_note(note))
+        formatted = format_note(note)
+        self._slot.notes.append(formatted)
+        return formatted
 
     def _get_ase(self, subschema: core_schema.CoreSchema) -> AnonymousSlotExpression:
         """
@@ -1065,7 +1024,10 @@ class SlotGenerator:
         """
         mode = schema["type"].split("-")[1]
 
-        self._attach_note(_validator_note(mode, schema["function"]["function"]))
+        function = schema["function"]["function"]
+        note = self._attach_note(_validator_note(mode, function))
+        if inspect.ismethod(function) and isinstance(function.__self__, type):
+            self.bound_validator_notes[(mode, function.__func__)] = note
         if mode != "plain":
             self._shape_slot(schema["schema"])
 

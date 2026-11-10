@@ -206,6 +206,40 @@ class TestLinkmlGenerator:
         # Base.x is int and Sub.x is str.
         assert schema.slots["x"].range is None
 
+    def test_override_of_nested_model_with_type_field(self):
+        class Payload(BaseModel):
+            type: str
+
+        class Parent(BaseModel):
+            payload: Payload
+
+        class Child(Parent):
+            payload: Payload = Field(description="Extra detail")
+
+        schema = LinkmlGenerator(models=[Payload, Parent, Child], enums=[]).generate()
+        child = schema.classes["Child"].slot_usage["payload"]
+        assert child.description == "Extra detail"
+
+    def test_validator_only_translated_on_child_keeps_warning(self):
+        class Checks:
+            @classmethod
+            def check(cls, value):
+                return value
+
+        Checked = Annotated[str, AfterValidator(Checks.check)]
+
+        class Parent(BaseModel):
+            value: dict[str, Checked]
+
+        class Child(Parent):
+            value: Checked
+
+        schema = LinkmlGenerator(models=[Parent, Child], enums=[]).generate()
+        parent = schema.classes["Parent"].slot_usage["value"]
+        child = schema.classes["Child"].slot_usage["value"]
+        assert in_no_string("Checks.check", parent.notes)
+        assert in_exactly_one_string("Checks.check", child.notes)
+
     def test_inherited_validator_warning_is_not_repeated(self):
         class Parent(BaseModel):
             schemaKey: str = "Parent"
